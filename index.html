@@ -1,0 +1,1627 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>トランプゲーム コレクション</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Tone.js for Sound Effects -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <!-- Canvas Confetti for Victory Effects -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap');
+        
+        body {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+            background-color: #0f172a;
+        }
+
+        /* Felt table texture simulation */
+        .felt-bg {
+            background: radial-gradient(circle, #15803d 0%, #166534 60%, #14532d 100%);
+        }
+
+        /* Custom scrollbar for modals */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+        }
+
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body class="h-screen w-screen overflow-hidden flex flex-col text-slate-100">
+
+    <!-- Header Navbar -->
+    <header class="h-16 bg-slate-900/90 border-b border-slate-800 px-4 flex items-center justify-between z-20 shrink-0">
+        <div class="flex items-center space-x-3">
+            <button id="btn-home" class="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-emerald-400 px-3 py-2 rounded-xl transition duration-150 border border-slate-700 shadow">
+                <i class="fa-solid fa-house text-lg"></i>
+                <span class="font-bold text-sm hidden sm:inline">メニュー</span>
+            </button>
+            <h1 id="game-title-header" class="font-black text-lg sm:text-xl text-amber-400 tracking-wide">
+                🃏 トランプコレクション
+            </h1>
+        </div>
+
+        <!-- Dynamic Game Info & Stats Header -->
+        <div class="flex items-center space-x-4">
+            <!-- Sound Toggle -->
+            <button id="btn-sound" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition border border-slate-700">
+                <i class="fa-solid fa-volume-high text-lg" id="sound-icon"></i>
+            </button>
+
+            <!-- Score Display -->
+            <div class="bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700 flex items-center space-x-2">
+                <i class="fa-solid fa-star text-amber-400 text-sm"></i>
+                <div class="text-xs">
+                    <span class="text-slate-400 block text-[10px] leading-tight">SCORE</span>
+                    <span id="score-display" class="font-bold text-amber-300 text-base leading-none">0</span>
+                </div>
+            </div>
+
+            <!-- Ranking Button -->
+            <button id="btn-ranking" class="flex items-center space-x-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 active:scale-95 text-slate-950 font-extrabold px-3 py-2 rounded-xl transition shadow-md shadow-amber-500/20 text-sm">
+                <i class="fa-solid fa-trophy"></i>
+                <span class="hidden sm:inline">ランキング</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Game Canvas Container -->
+    <main class="relative flex-1 w-full h-full felt-bg overflow-hidden flex items-center justify-center">
+        <!-- Main HTML5 Canvas -->
+        <canvas id="gameCanvas" class="w-full h-full block cursor-pointer"></canvas>
+
+        <!-- Dynamic Control Bar Overlay for Games (HTML Overlay) -->
+        <div id="game-controls" class="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-center space-x-3 pointer-events-auto z-10 hidden">
+            <!-- Buttons dynamically inserted based on active game -->
+        </div>
+    </main>
+
+    <!-- Modal: Ranking & High Scores -->
+    <div id="modal-ranking" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="glass-panel w-full max-w-md rounded-3xl p-6 shadow-2xl border border-slate-700 flex flex-col max-h-[85vh]">
+            <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+                <div class="flex items-center space-x-2 text-amber-400">
+                    <i class="fa-solid fa-trophy text-2xl"></i>
+                    <h2 class="text-xl font-black">ハイスコア・ランキング</h2>
+                </div>
+                <button class="btn-close-modal text-slate-400 hover:text-white p-2 text-xl">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            
+            <!-- Game selector tabs for ranking -->
+            <div class="flex bg-slate-800/80 p-1 rounded-xl my-4 text-xs font-bold text-slate-400">
+                <button class="rank-tab flex-1 py-2 rounded-lg transition bg-amber-500 text-slate-950" data-game="hilow">Hi or Low</button>
+                <button class="rank-tab flex-1 py-2 rounded-lg transition" data-game="memory">神経衰弱</button>
+                <button class="rank-tab flex-1 py-2 rounded-lg transition" data-game="sevens">7並べ</button>
+                <button class="rank-tab flex-1 py-2 rounded-lg transition" data-game="solitaire">ソリティア</button>
+            </div>
+
+            <!-- Scores List Container -->
+            <div id="ranking-list" class="flex-1 overflow-y-auto space-y-2 pr-1">
+                <!-- Dynamically populated -->
+            </div>
+
+            <button class="btn-close-modal w-full mt-4 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-3 rounded-xl transition border border-slate-700">
+                閉じる
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal: Custom Message / Game Over Notification -->
+    <div id="modal-msg" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="glass-panel w-full max-w-sm rounded-3xl p-6 text-center border border-slate-700 shadow-2xl transform transition-all scale-100">
+            <div id="msg-icon" class="text-5xl mb-3 text-amber-400">🎉</div>
+            <h3 id="msg-title" class="text-2xl font-black mb-2 text-white">ゲームクリア！</h3>
+            <p id="msg-body" class="text-slate-300 text-sm mb-6">スコア: <span id="msg-score" class="text-amber-400 font-bold">1000</span></p>
+            <div class="flex space-x-3">
+                <button id="btn-msg-home" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-3 rounded-xl transition border border-slate-700">
+                    メニュー
+                </button>
+                <button id="btn-msg-restart" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl transition shadow-lg shadow-emerald-600/30">
+                    もう一度
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Sound System using Tone.js
+        const Sound = {
+            muted: false,
+            synth: null,
+            polySynth: null,
+
+            init() {
+                try {
+                    this.synth = new Tone.Synth().toDestination();
+                    this.polySynth = new Tone.PolySynth().toDestination();
+                    Tone.Destination.volume.value = -6; // Slightly softer volume
+                } catch(e) {
+                    console.log("Audio Init Error", e);
+                }
+            },
+
+            playCardFlip() {
+                if (this.muted || !this.synth) return;
+                try {
+                    Tone.start();
+                    this.synth.triggerAttackRelease("C5", "32n", undefined, 0.3);
+                } catch(e) {}
+            },
+
+            playSuccess() {
+                if (this.muted || !this.polySynth) return;
+                try {
+                    Tone.start();
+                    const now = Tone.now();
+                    this.polySynth.triggerAttackRelease(["E5", "G5", "C6"], "16n", now);
+                } catch(e) {}
+            },
+
+            playFail() {
+                if (this.muted || !this.synth) return;
+                try {
+                    Tone.start();
+                    this.synth.triggerAttackRelease("A2", "8n", undefined, 0.5);
+                } catch(e) {}
+            },
+
+            playVictory() {
+                if (this.muted || !this.polySynth) return;
+                try {
+                    Tone.start();
+                    const now = Tone.now();
+                    this.polySynth.triggerAttackRelease(["C4", "E4", "G4", "C5"], "8n", now);
+                    this.polySynth.triggerAttackRelease(["G4", "B4", "D5", "G5"], "8n", now + 0.2);
+                    this.polySynth.triggerAttackRelease(["C5", "E5", "G5", "C6"], "4n", now + 0.4);
+                } catch(e) {}
+            }
+        };
+
+        // Card Representation
+        const SUITS = {
+            spade: { symbol: '♠', color: '#0f172a', name: 'spade' },
+            heart: { symbol: '♥', color: '#dc2626', name: 'heart' },
+            diamond: { symbol: '♦', color: '#dc2626', name: 'diamond' },
+            club: { symbol: '♣', color: '#0f172a', name: 'club' }
+        };
+
+        class Card {
+            constructor(suit, value) {
+                this.suit = suit; // spade, heart, diamond, club
+                this.value = value; // 1 to 13
+                this.faceUp = false;
+                this.x = 0;
+                this.y = 0;
+                this.width = 80;
+                this.height = 116;
+                this.targetX = 0;
+                this.targetY = 0;
+                this.highlighted = false;
+                this.selectable = true;
+                this.animating = false;
+            }
+
+            get suitInfo() {
+                return SUITS[this.suit];
+            }
+
+            get valueStr() {
+                if (this.value === 1) return 'A';
+                if (this.value === 11) return 'J';
+                if (this.value === 12) return 'Q';
+                if (this.value === 13) return 'K';
+                return this.value.toString();
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+
+                // Card Shadow
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+                ctx.shadowBlur = 8;
+                ctx.shadowOffsetY = 4;
+
+                const radius = 8;
+                const w = this.width;
+                const h = this.height;
+
+                // Draw Base Card Body
+                ctx.beginPath();
+                ctx.moveTo(radius, 0);
+                ctx.lineTo(w - radius, 0);
+                ctx.quadraticCurveTo(w, 0, w, radius);
+                ctx.lineTo(w, h - radius);
+                ctx.quadraticCurveTo(w, h, w - radius, h);
+                ctx.lineTo(radius, h);
+                ctx.quadraticCurveTo(0, h, 0, h - radius);
+                ctx.lineTo(0, radius);
+                ctx.quadraticCurveTo(0, 0, radius, 0);
+                ctx.closePath();
+
+                if (this.faceUp) {
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fill();
+
+                    // Remove Shadow for inner details
+                    ctx.shadowColor = 'transparent';
+
+                    // Selection / Highlight Border
+                    if (this.highlighted) {
+                        ctx.strokeStyle = '#f59e0b'; // Amber border
+                        ctx.lineWidth = 4;
+                        ctx.stroke();
+                    } else {
+                        ctx.strokeStyle = '#cbd5e1'; // Light border
+                        ctx.lineWidth = 1;
+                        ctx.stroke();
+                    }
+
+                    // Card Rank & Suit Drawing
+                    const color = this.suitInfo.color;
+                    ctx.fillStyle = color;
+                    ctx.font = 'bold 16px "M PLUS Rounded 1c", sans-serif';
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'top';
+
+                    // Top Left Rank & Symbol
+                    ctx.fillText(this.valueStr, 6, 6);
+                    ctx.font = '14px sans-serif';
+                    ctx.fillText(this.suitInfo.symbol, 6, 24);
+
+                    // Center Big Suit Icon
+                    ctx.font = '36px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(this.suitInfo.symbol, w / 2, h / 2);
+
+                    // Bottom Right (Inverted)
+                    ctx.save();
+                    ctx.translate(w, h);
+                    ctx.rotate(Math.PI);
+                    ctx.font = 'bold 16px "M PLUS Rounded 1c", sans-serif';
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'top';
+                    ctx.fillText(this.valueStr, 6, 6);
+                    ctx.font = '14px sans-serif';
+                    ctx.fillText(this.suitInfo.symbol, 6, 24);
+                    ctx.restore();
+
+                } else {
+                    // Card Back Design
+                    ctx.fillStyle = '#1e3a8a'; // Deep blue
+                    ctx.fill();
+                    ctx.shadowColor = 'transparent';
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+
+                    // Pattern on Back
+                    ctx.fillStyle = '#2563eb';
+                    const pad = 6;
+                    ctx.fillRect(pad, pad, w - pad * 2, h - pad * 2);
+
+                    // Cross Hatch Pattern
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    for (let i = -w; i < w * 2; i += 10) {
+                        ctx.moveTo(i, pad);
+                        ctx.lineTo(i + h, h - pad);
+                    }
+                    ctx.stroke();
+                }
+
+                ctx.restore();
+            }
+
+            containsPoint(px, py) {
+                return px >= this.x && px <= this.x + this.width &&
+                       py >= this.y && py <= this.y + this.height;
+            }
+
+            updatePos() {
+                // Smooth interpolation to target position
+                this.x += (this.targetX - this.x) * 0.25;
+                this.y += (this.targetY - this.y) * 0.25;
+            }
+        }
+
+        // Helper Deck Builder
+        function createDeck() {
+            const deck = [];
+            const suits = ['spade', 'heart', 'diamond', 'club'];
+            for (let suit of suits) {
+                for (let val = 1; val <= 13; val++) {
+                    deck.push(new Card(suit, val));
+                }
+            }
+            return deck;
+        }
+
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        const RankingManager = {
+            getScores(gameKey) {
+                const data = localStorage.getItem('trump_suite_scores_' + gameKey);
+                return data ? JSON.parse(data) : [];
+            },
+            addScore(gameKey, score) {
+                if (score <= 0) return;
+                const scores = this.getScores(gameKey);
+                const date = new Date().toLocaleDateString('ja-JP');
+                scores.push({ score, date });
+                scores.sort((a, b) => b.score - a.score);
+                const topScores = scores.slice(0, 10);
+                localStorage.setItem('trump_suite_scores_' + gameKey, JSON.stringify(topScores));
+            }
+        };
+
+        class GameEngine {
+            constructor() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.currentMode = 'TITLE'; // TITLE, HILOW, MEMORY, SEVENS, SOLITAIRE
+                this.score = 0;
+                this.gameControls = document.getElementById('game-controls');
+
+                this.resizeCanvas();
+                window.addEventListener('resize', () => this.resizeCanvas());
+
+                // Mouse / Touch Event Listeners
+                this.canvas.addEventListener('mousedown', (e) => this.handlePointerDown(e));
+                this.canvas.addEventListener('mousemove', (e) => this.handlePointerMove(e));
+                this.canvas.addEventListener('mouseup', (e) => this.handlePointerUp(e));
+
+                this.canvas.addEventListener('touchstart', (e) => {
+                    if (e.cancelable) e.preventDefault();
+                    this.handlePointerDown(e);
+                }, { passive: false });
+                this.canvas.addEventListener('touchmove', (e) => {
+                    if (e.cancelable) e.preventDefault();
+                    this.handlePointerMove(e);
+                }, { passive: false });
+                this.canvas.addEventListener('touchend', (e) => {
+                    if (e.cancelable) e.preventDefault();
+                    this.handlePointerUp(e);
+                }, { passive: false });
+
+                // Title Screen Cards for decoration
+                this.titleCards = [];
+                this.initTitleAnimation();
+
+                // Game Handlers
+                this.hiLowState = null;
+                this.memoryState = null;
+                this.sevensState = null;
+                this.solitaireState = null;
+
+                // Animation loop
+                requestAnimationFrame(() => this.loop());
+            }
+
+            resizeCanvas() {
+                const rect = this.canvas.parentElement.getBoundingClientRect();
+                this.canvas.width = rect.width;
+                this.canvas.height = rect.height;
+                if (this.currentMode === 'SOLITAIRE') {
+                    this.layoutSolitaire();
+                }
+            }
+
+            setScore(val) {
+                this.score = val;
+                document.getElementById('score-display').innerText = this.score;
+            }
+
+            addScore(val) {
+                this.setScore(this.score + val);
+            }
+
+            initTitleAnimation() {
+                this.titleCards = [];
+                const suits = ['spade', 'heart', 'diamond', 'club'];
+                for (let i = 0; i < 4; i++) {
+                    const c = new Card(suits[i], [1, 13, 12, 11][i]);
+                    c.faceUp = true;
+                    c.x = Math.random() * (this.canvas.width - 100);
+                    c.y = Math.random() * (this.canvas.height - 150);
+                    c.vx = (Math.random() - 0.5) * 1.5;
+                    c.vy = (Math.random() - 0.5) * 1.5;
+                    this.titleCards.push(c);
+                }
+            }
+
+            drawTitleScreen() {
+                const ctx = this.ctx;
+                const width = this.canvas.width;
+                const height = this.canvas.height;
+
+                // Animate background floating cards
+                this.titleCards.forEach(c => {
+                    c.x += c.vx;
+                    c.y += c.vy;
+                    if (c.x < 10 || c.x > width - 90) c.vx *= -1;
+                    if (c.y < 10 || c.y > height - 130) c.vy *= -1;
+                    c.draw(ctx);
+                });
+
+                // Title Banner Overlay
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+                ctx.fillRect(0, 0, width, height);
+
+                // Main Title Text
+                ctx.save();
+                ctx.textAlign = 'center';
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+                ctx.shadowBlur = 10;
+                
+                ctx.fillStyle = '#fbbf24';
+                ctx.font = '900 32px "M PLUS Rounded 1c", sans-serif';
+                ctx.fillText('トランプゲーム コレクション', width / 2, height * 0.18);
+
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = '700 15px "M PLUS Rounded 1c", sans-serif';
+                ctx.fillText('遊ぶゲームを選択してください', width / 2, height * 0.24);
+                ctx.restore();
+
+                // Draw Game Cards Buttons
+                const buttons = [
+                    { id: 'HILOW', title: 'Hi or Low', icon: '🔥', desc: '次の数字を予想！', color: '#ef4444' },
+                    { id: 'MEMORY', title: '神経衰弱', icon: '🧠', desc: 'ペアを見つけよう！', color: '#3b82f6' },
+                    { id: 'SEVENS', title: '7並べ', icon: '7️⃣', desc: '対戦！手札を出し切れ', color: '#10b981' },
+                    { id: 'SOLITAIRE', title: 'ソリティア', icon: '👑', desc: '定番クロンダイク', color: '#f59e0b' }
+                ];
+
+                const isMobile = width < 640;
+                const cols = isMobile ? 2 : 4;
+                const rows = isMobile ? 2 : 1;
+                
+                const cardWidth = Math.min(200, (width - 40 - (cols - 1) * 16) / cols);
+                const cardHeight = isMobile ? 120 : 150;
+                const gap = 16;
+                
+                const totalWidth = cols * cardWidth + (cols - 1) * gap;
+                const totalHeight = rows * cardHeight + (rows - 1) * gap;
+                const startX = (width - totalWidth) / 2;
+                const startY = height * 0.35;
+
+                if (!this.titleButtons) this.titleButtons = [];
+
+                buttons.forEach((btn, idx) => {
+                    const col = idx % cols;
+                    const row = Math.floor(idx / cols);
+                    const bx = startX + col * (cardWidth + gap);
+                    const by = startY + row * (cardHeight + gap);
+
+                    const existingBtn = this.titleButtons.find(b => b.id === btn.id);
+                    const isHovered = existingBtn ? existingBtn.hover : false;
+
+                    btn.rect = { x: bx, y: by, w: cardWidth, h: cardHeight };
+                    btn.hover = isHovered;
+                    this.titleButtons[idx] = btn;
+
+                    // Draw Button Card Box
+                    ctx.save();
+                    ctx.translate(bx, by);
+
+                    const offsetY = isHovered ? -4 : 0;
+                    ctx.translate(0, offsetY);
+
+                    ctx.shadowColor = isHovered ? btn.color : 'rgba(0, 0, 0, 0.4)';
+                    ctx.shadowBlur = isHovered ? 16 : 8;
+
+                    // Fill Box
+                    ctx.fillStyle = '#1e293b';
+                    ctx.beginPath();
+                    ctx.roundRect(0, 0, cardWidth, cardHeight, 16);
+                    ctx.fill();
+
+                    // Border
+                    ctx.strokeStyle = isHovered ? btn.color : 'rgba(255, 255, 255, 0.15)';
+                    ctx.lineWidth = isHovered ? 3 : 1.5;
+                    ctx.stroke();
+
+                    // Content
+                    ctx.shadowBlur = 0;
+                    ctx.textAlign = 'center';
+
+                    // Emoji Icon
+                    ctx.font = `${isMobile ? '28px' : '36px'} sans-serif`;
+                    ctx.fillText(btn.icon, cardWidth / 2, isMobile ? 36 : 45);
+
+                    // Title
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = `bold ${isMobile ? '16px' : '18px'} "M PLUS Rounded 1c"`;
+                    ctx.fillText(btn.title, cardWidth / 2, isMobile ? 68 : 82);
+
+                    // Subtitle / Desc
+                    ctx.fillStyle = '#94a3b8';
+                    ctx.font = `${isMobile ? '11px' : '12px'} "M PLUS Rounded 1c"`;
+                    ctx.fillText(btn.desc, cardWidth / 2, isMobile ? 92 : 110);
+
+                    ctx.restore();
+                });
+            }
+
+            getPointerPos(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                let clientX = e.clientX;
+                let clientY = e.clientY;
+                if (e.touches && e.touches.length > 0) {
+                    clientX = e.touches[0].clientX;
+                    clientY = e.touches[0].clientY;
+                } else if (e.changedTouches && e.changedTouches.length > 0) {
+                    clientX = e.changedTouches[0].clientX;
+                    clientY = e.changedTouches[0].clientY;
+                }
+                return {
+                    x: clientX - rect.left,
+                    y: clientY - rect.top
+                };
+            }
+
+            startHiLow() {
+                this.currentMode = 'HILOW';
+                this.setScore(0);
+                this.hiLowState = {
+                    deck: shuffle(createDeck()),
+                    currentCard: null,
+                    nextCard: null,
+                    combo: 0,
+                    gameOver: false,
+                    phase: 'GUESSING', // 'GUESSING' | 'RESULT'
+                    isCorrect: null,
+                    lastGuess: null
+                };
+                this.hiLowState.currentCard = this.hiLowState.deck.pop();
+                this.hiLowState.currentCard.faceUp = true;
+                
+                this.showHiLowGuessControls();
+            }
+
+            showHiLowGuessControls() {
+                this.gameControls.innerHTML = `
+                    <button id="btn-hi" class="bg-rose-600 hover:bg-rose-500 text-white font-black px-8 py-3 rounded-2xl shadow-lg transition text-lg flex items-center space-x-2">
+                        <i class="fa-solid fa-arrow-up"></i> <span>HIGH (高い)</span>
+                    </button>
+                    <button id="btn-low" class="bg-sky-600 hover:bg-sky-500 text-white font-black px-8 py-3 rounded-2xl shadow-lg transition text-lg flex items-center space-x-2">
+                        <i class="fa-solid fa-arrow-down"></i> <span>LOW (低い)</span>
+                    </button>
+                `;
+                this.gameControls.classList.remove('hidden');
+
+                document.getElementById('btn-hi').onclick = () => this.guessHiLow('HIGH');
+                document.getElementById('btn-low').onclick = () => this.guessHiLow('LOW');
+            }
+
+            showHiLowResultControls() {
+                this.gameControls.innerHTML = `
+                    <button id="btn-next" class="bg-emerald-600 hover:bg-emerald-500 text-white font-black px-8 py-3 rounded-2xl shadow-lg transition text-lg flex items-center space-x-2">
+                        <i class="fa-solid fa-forward"></i> <span>次へ</span>
+                    </button>
+                    <button id="btn-quit" class="bg-slate-700 hover:bg-slate-600 text-white font-black px-8 py-3 rounded-2xl shadow-lg transition text-lg flex items-center space-x-2">
+                        <i class="fa-solid fa-door-open"></i> <span>終了</span>
+                    </button>
+                `;
+                this.gameControls.classList.remove('hidden');
+
+                document.getElementById('btn-next').onclick = () => this.nextHiLowRound();
+                document.getElementById('btn-quit').onclick = () => this.quitHiLow();
+            }
+
+            guessHiLow(choice) {
+                if (!this.hiLowState || this.hiLowState.phase !== 'GUESSING') return;
+
+                const state = this.hiLowState;
+                if (state.deck.length === 0) {
+                    Sound.playVictory();
+                    RankingManager.addScore('hilow', this.score);
+                    showMsgModal('🎉 全カード終了！クリア！', `最終スコア: ${this.score}`);
+                    return;
+                }
+
+                state.nextCard = state.deck.pop();
+                state.nextCard.faceUp = true;
+
+                const curVal = state.currentCard.value;
+                const nextVal = state.nextCard.value;
+
+                let isCorrect = false;
+                if (choice === 'HIGH' && nextVal >= curVal) isCorrect = true;
+                if (choice === 'LOW' && nextVal <= curVal) isCorrect = true;
+
+                state.phase = 'RESULT';
+                state.lastGuess = choice;
+                state.isCorrect = isCorrect;
+
+                if (isCorrect) {
+                    Sound.playSuccess();
+                } else {
+                    Sound.playFail();
+                }
+
+                this.showHiLowResultControls();
+            }
+
+            nextHiLowRound() {
+                if (!this.hiLowState || this.hiLowState.phase !== 'RESULT') return;
+                const state = this.hiLowState;
+
+                if (state.isCorrect) {
+                    state.combo++;
+                    const pts = 100 * state.combo;
+                    this.addScore(pts);
+
+                    if (state.deck.length === 0) {
+                        Sound.playVictory();
+                        RankingManager.addScore('hilow', this.score);
+                        showMsgModal('🎉 全カード終了！クリア！', `最終スコア: ${this.score}`);
+                        return;
+                    }
+
+                    state.currentCard = state.nextCard;
+                    state.nextCard = null;
+                    state.phase = 'GUESSING';
+                    state.isCorrect = null;
+                    state.lastGuess = null;
+
+                    this.showHiLowGuessControls();
+                } else {
+                    state.gameOver = true;
+                    RankingManager.addScore('hilow', this.score);
+                    showMsgModal('💥 残念！ゲームオーバー', `獲得スコア: ${this.score}\n正解は ${state.nextCard.valueStr} でした`);
+                }
+            }
+
+            quitHiLow() {
+                if (this.score > 0) {
+                    RankingManager.addScore('hilow', this.score);
+                }
+                this.returnToMenu();
+            }
+
+            drawHiLow() {
+                const ctx = this.ctx;
+                const w = this.canvas.width;
+                const h = this.canvas.height;
+                const state = this.hiLowState;
+
+                // Center Title
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 22px "M PLUS Rounded 1c"';
+                ctx.textAlign = 'center';
+                ctx.fillText('Hi or Low (ハイ＆ロー)', w / 2, 40);
+
+                ctx.fillStyle = '#cbd5e1';
+                ctx.font = '14px "M PLUS Rounded 1c"';
+                ctx.fillText(`残りの山札: ${state.deck.length} 枚 | 連続コンボ: ${state.combo}x`, w / 2, 68);
+
+                // Card Positions
+                const cardW = 110;
+                const cardH = 160;
+
+                // Current Card Position (Left)
+                const curX = w / 2 - cardW - 20;
+                const curY = h / 2 - cardH / 2 - 20;
+
+                state.currentCard.width = cardW;
+                state.currentCard.height = cardH;
+                state.currentCard.x = curX;
+                state.currentCard.y = curY;
+                state.currentCard.draw(ctx);
+
+                // Next Card Slot / Revealed Card (Right)
+                const nextX = w / 2 + 20;
+                const nextY = curY;
+
+                if (state.nextCard) {
+                    state.nextCard.width = cardW;
+                    state.nextCard.height = cardH;
+                    state.nextCard.x = nextX;
+                    state.nextCard.y = nextY;
+                    state.nextCard.draw(ctx);
+                } else {
+                    // Empty Card Slot Outline
+                    ctx.save();
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+                    ctx.setLineDash([6, 6]);
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.roundRect(nextX, nextY, cardW, cardH, 8);
+                    ctx.stroke();
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+                    ctx.font = 'bold 16px "M PLUS Rounded 1c"';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('次カード', nextX + cardW / 2, nextY + cardH / 2);
+                    ctx.restore();
+                }
+
+                // Phase Result Display
+                if (state.phase === 'RESULT') {
+                    ctx.save();
+                    ctx.textAlign = 'center';
+                    if (state.isCorrect) {
+                        ctx.fillStyle = '#4ade80';
+                        ctx.font = '900 24px "M PLUS Rounded 1c"';
+                        ctx.fillText('⭕️ 正解！', w / 2, curY + cardH + 32);
+                    } else {
+                        ctx.fillStyle = '#f87171';
+                        ctx.font = '900 24px "M PLUS Rounded 1c"';
+                        ctx.fillText('❌ 不正解…', w / 2, curY + cardH + 32);
+                    }
+                    ctx.fillStyle = '#cbd5e1';
+                    ctx.font = '14px "M PLUS Rounded 1c"';
+                    ctx.fillText(`あなたの予想: ${state.lastGuess} | 「次へ」または「終了」を選択してください`, w / 2, curY + cardH + 58);
+                    ctx.restore();
+                }
+            }
+
+            startMemory() {
+                this.currentMode = 'MEMORY';
+                this.setScore(0);
+                this.gameControls.classList.add('hidden');
+
+                // 24 cards (12 pairs) for optimized mobile/canvas layout
+                const suits = ['spade', 'heart'];
+                let selectedCards = [];
+                for (let s of suits) {
+                    for (let v = 1; v <= 12; v++) {
+                        selectedCards.push(new Card(s, v));
+                    }
+                }
+                selectedCards = shuffle(selectedCards);
+
+                this.memoryState = {
+                    cards: selectedCards,
+                    firstCard: null,
+                    secondCard: null,
+                    lock: false,
+                    matchedPairs: 0,
+                    turns: 0
+                };
+
+                this.layoutMemoryCards();
+            }
+
+            layoutMemoryCards() {
+                if (!this.memoryState) return;
+                const w = this.canvas.width;
+                const h = this.canvas.height;
+                const cols = 6;
+                const rows = 4;
+
+                const cardW = Math.min(80, (w - 40) / cols - 10);
+                const cardH = cardW * 1.4;
+
+                const totalW = cols * (cardW + 10) - 10;
+                const totalH = rows * (cardH + 10) - 10;
+                const startX = (w - totalW) / 2;
+                const startY = (h - totalH) / 2 + 20;
+
+                this.memoryState.cards.forEach((c, i) => {
+                    const col = i % cols;
+                    const row = Math.floor(i / cols);
+                    c.width = cardW;
+                    c.height = cardH;
+                    c.x = startX + col * (cardW + 10);
+                    c.y = startY + row * (cardH + 10);
+                });
+            }
+
+            clickMemory(x, y) {
+                const state = this.memoryState;
+                if (!state || state.lock) return;
+
+                for (let card of state.cards) {
+                    if (card.containsPoint(x, y) && !card.faceUp) {
+                        Sound.playCardFlip();
+                        card.faceUp = true;
+
+                        if (!state.firstCard) {
+                            state.firstCard = card;
+                        } else {
+                            state.secondCard = card;
+                            state.lock = true;
+                            state.turns++;
+
+                            // Check Match
+                            if (state.firstCard.value === state.secondCard.value) {
+                                Sound.playSuccess();
+                                this.addScore(200);
+                                state.matchedPairs++;
+                                state.firstCard = null;
+                                state.secondCard = null;
+                                state.lock = false;
+
+                                if (state.matchedPairs === 12) {
+                                    Sound.playVictory();
+                                    const bonus = Math.max(0, 3000 - state.turns * 100);
+                                    this.addScore(bonus);
+                                    RankingManager.addScore('memory', this.score);
+                                    setTimeout(() => {
+                                        showMsgModal('🎉 神経衰弱 クリア！', `ターン数: ${state.turns}\n最終スコア: ${this.score}`);
+                                    }, 500);
+                                }
+                            } else {
+                                Sound.playFail();
+                                setTimeout(() => {
+                                    state.firstCard.faceUp = false;
+                                    state.secondCard.faceUp = false;
+                                    state.firstCard = null;
+                                    state.secondCard = null;
+                                    state.lock = false;
+                                }, 1000);
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+
+            drawMemory() {
+                const ctx = this.ctx;
+                const w = this.canvas.width;
+                const state = this.memoryState;
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 22px "M PLUS Rounded 1c"';
+                ctx.textAlign = 'center';
+                ctx.fillText('神経衰弱 (Memory)', w / 2, 40);
+
+                ctx.fillStyle = '#cbd5e1';
+                ctx.font = '14px "M PLUS Rounded 1c"';
+                ctx.fillText(`揃えたペア: ${state.matchedPairs} / 12  |  ターン数: ${state.turns}`, w / 2, 68);
+
+                state.cards.forEach(c => c.draw(ctx));
+            }
+
+            startSevens() {
+                this.currentMode = 'SEVENS';
+                this.setScore(0);
+
+                const fullDeck = createDeck();
+                const shuffled = shuffle(fullDeck);
+
+                // 4 Players (0: Player, 1: CPU1, 2: CPU2, 3: CPU3)
+                const hands = [[], [], [], []];
+                const board = { spade: {}, heart: {}, diamond: {}, club: {} };
+
+                shuffled.forEach((card, idx) => {
+                    const playerIdx = idx % 4;
+                    if (card.value === 7) {
+                        // Place 7s directly on board
+                        card.faceUp = true;
+                        board[card.suit][7] = card;
+                    } else {
+                        hands[playerIdx].push(card);
+                    }
+                });
+
+                // Sort hands by suit and value
+                hands.forEach(h => {
+                    h.sort((a, b) => a.suit.localeCompare(b.suit) || a.value - b.value);
+                });
+
+                this.sevensState = {
+                    board,
+                    hands,
+                    passes: [0, 0, 0, 0],
+                    turn: 0, // 0 is player
+                    finished: [false, false, false, false],
+                    rankings: []
+                };
+
+                this.gameControls.innerHTML = `
+                    <button id="btn-pass" class="bg-amber-600 hover:bg-amber-500 text-white font-bold px-6 py-2.5 rounded-xl shadow transition text-sm">
+                        パス (<span id="pass-count">3</span>/3)
+                    </button>
+                `;
+                this.gameControls.classList.remove('hidden');
+                document.getElementById('btn-pass').onclick = () => this.passSevens();
+
+                this.updateSevensLayout();
+            }
+
+            updateSevensLayout() {
+                if (!this.sevensState) return;
+                const w = this.canvas.width;
+                const h = this.canvas.height;
+                const playerHand = this.sevensState.hands[0];
+
+                // Player card sizes
+                const cardW = Math.min(60, (w - 40) / Math.max(playerHand.length, 1));
+                const cardH = cardW * 1.4;
+                const startX = (w - (playerHand.length * (cardW + 4))) / 2;
+                const startY = h - cardH - 30;
+
+                playerHand.forEach((c, i) => {
+                    c.width = cardW;
+                    c.height = cardH;
+                    c.x = startX + i * (cardW + 4);
+                    c.y = startY;
+                    c.faceUp = true;
+                    c.highlighted = this.canPlaySevensCard(c);
+                });
+            }
+
+            canPlaySevensCard(card) {
+                const b = this.sevensState.board[card.suit];
+                return b[card.value - 1] || b[card.value + 1];
+            }
+
+            clickSevens(x, y) {
+                const state = this.sevensState;
+                if (!state || state.turn !== 0) return;
+
+                const playerHand = state.hands[0];
+                for (let i = 0; i < playerHand.length; i++) {
+                    const card = playerHand[i];
+                    if (card.containsPoint(x, y) && this.canPlaySevensCard(card)) {
+                        Sound.playSuccess();
+                        // Play card
+                        state.board[card.suit][card.value] = card;
+                        playerHand.splice(i, 1);
+
+                        if (playerHand.length === 0) {
+                            state.finished[0] = true;
+                            state.rankings.push(0);
+                        }
+
+                        this.nextSevensTurn();
+                        break;
+                    }
+                }
+            }
+
+            passSevens() {
+                const state = this.sevensState;
+                if (!state || state.turn !== 0) return;
+
+                if (state.passes[0] >= 3) {
+                    Sound.playFail();
+                    return;
+                }
+
+                Sound.playCardFlip();
+                state.passes[0]++;
+                document.getElementById('pass-count').innerText = 3 - state.passes[0];
+                this.nextSevensTurn();
+            }
+
+            nextSevensTurn() {
+                const state = this.sevensState;
+                if (state.rankings.length >= 3) {
+                    this.endSevens();
+                    return;
+                }
+
+                state.turn = (state.turn + 1) % 4;
+                this.updateSevensLayout();
+
+                if (state.turn !== 0 && !state.finished[state.turn]) {
+                    setTimeout(() => this.cpuPlaySevens(), 600);
+                } else if (state.finished[state.turn]) {
+                    this.nextSevensTurn();
+                }
+            }
+
+            cpuPlaySevens() {
+                const state = this.sevensState;
+                const cpuIdx = state.turn;
+                const hand = state.hands[cpuIdx];
+
+                const playableIdx = hand.findIndex(c => this.canPlaySevensCard(c));
+                if (playableIdx !== -1) {
+                    const card = hand.splice(playableIdx, 1)[0];
+                    card.faceUp = true;
+                    state.board[card.suit][card.value] = card;
+                    if (hand.length === 0) {
+                        state.finished[cpuIdx] = true;
+                        state.rankings.push(cpuIdx);
+                    }
+                } else {
+                    state.passes[cpuIdx]++;
+                    if (state.passes[cpuIdx] > 3) {
+                        // CPU eliminated - dump hand onto board
+                        hand.forEach(c => {
+                            c.faceUp = true;
+                            state.board[c.suit][c.value] = c;
+                        });
+                        state.hands[cpuIdx] = [];
+                        state.finished[cpuIdx] = true;
+                    }
+                }
+
+                this.nextSevensTurn();
+            }
+
+            endSevens() {
+                const state = this.sevensState;
+                const playerRank = state.rankings.indexOf(0) + 1 || 4;
+                const scores = [1000, 600, 300, 0];
+                const pts = scores[playerRank - 1];
+                this.setScore(pts);
+
+                if (playerRank === 1) Sound.playVictory();
+                else Sound.playFail();
+
+                RankingManager.addScore('sevens', this.score);
+                showMsgModal(playerRank === 1 ? '🥇 1位でクリア！' : `${playerRank}位で終了`, `獲得スコア: ${this.score}`);
+            }
+
+            drawSevens() {
+                const ctx = this.ctx;
+                const w = this.canvas.width;
+                const h = this.canvas.height;
+                const state = this.sevensState;
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 22px "M PLUS Rounded 1c"';
+                ctx.textAlign = 'center';
+                ctx.fillText('7並べ (Sevens)', w / 2, 36);
+
+                // Draw Board Grid (7 in center)
+                const suits = ['spade', 'heart', 'diamond', 'club'];
+                const gridW = Math.min(42, (w - 40) / 13);
+                const gridH = gridW * 1.35;
+                const startX = (w - (13 * gridW)) / 2;
+                const startY = 60;
+
+                suits.forEach((suit, row) => {
+                    for (let val = 1; val <= 13; val++) {
+                        const x = startX + (val - 1) * gridW;
+                        const y = startY + row * (gridH + 4);
+
+                        const card = state.board[suit][val];
+                        if (card) {
+                            card.x = x;
+                            card.y = y;
+                            card.width = gridW;
+                            card.height = gridH;
+                            card.draw(ctx);
+                        } else {
+                            ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+                            ctx.lineWidth = 1;
+                            ctx.beginPath();
+                            ctx.roundRect(x, y, gridW - 2, gridH - 2, 4);
+                            ctx.stroke();
+                        }
+                    }
+                });
+
+                // Draw Turn Info
+                ctx.fillStyle = state.turn === 0 ? '#f59e0b' : '#94a3b8';
+                ctx.font = 'bold 16px "M PLUS Rounded 1c"';
+                ctx.fillText(state.turn === 0 ? '👉 あなたのターン' : `CPU ${state.turn} が思考中...`, w / 2, startY + 4 * (gridH + 4) + 20);
+
+                // Draw Player Hand Cards
+                state.hands[0].forEach(c => c.draw(ctx));
+            }
+
+            startSolitaire() {
+                this.currentMode = 'SOLITAIRE';
+                this.setScore(0);
+                this.gameControls.classList.add('hidden');
+
+                const deck = shuffle(createDeck());
+                
+                // 7 Tableau Piles
+                const tableau = [[], [], [], [], [], [], []];
+                for (let i = 0; i < 7; i++) {
+                    for (let j = 0; j <= i; j++) {
+                        const card = deck.pop();
+                        if (j === i) card.faceUp = true;
+                        tableau[i].push(card);
+                    }
+                }
+
+                this.solitaireState = {
+                    stock: deck,
+                    waste: [],
+                    foundations: { spade: [], heart: [], diamond: [], club: [] },
+                    tableau: tableau,
+                    selected: null
+                };
+
+                this.layoutSolitaire();
+            }
+
+            layoutSolitaire() {
+                if (!this.solitaireState) return;
+                const w = this.canvas.width;
+                const cardW = Math.min(75, (w - 40) / 7 - 8);
+                const cardH = cardW * 1.4;
+                const startX = (w - (7 * (cardW + 8))) / 2;
+                
+                const s = this.solitaireState;
+
+                // Skip positions for currently dragged cards
+                const isCardDragged = (card) => this.dragData && this.dragData.cards.includes(card);
+
+                // Stock & Waste Position
+                s.stock.forEach(c => {
+                    c.width = cardW; c.height = cardH;
+                    if (!isCardDragged(c)) { c.x = startX; c.y = 50; }
+                    c.faceUp = false;
+                });
+                s.waste.forEach(c => {
+                    c.width = cardW; c.height = cardH;
+                    if (!isCardDragged(c)) { c.x = startX + cardW + 12; c.y = 50; }
+                    c.faceUp = true;
+                });
+
+                // Foundations Position
+                const suits = ['spade', 'heart', 'diamond', 'club'];
+                suits.forEach((suit, i) => {
+                    s.foundations[suit].forEach(c => {
+                        c.width = cardW; c.height = cardH;
+                        if (!isCardDragged(c)) { c.x = startX + (i + 3) * (cardW + 8); c.y = 50; }
+                        c.faceUp = true;
+                    });
+                });
+
+                // Tableau Position
+                s.tableau.forEach((col, colIdx) => {
+                    const colX = startX + colIdx * (cardW + 8);
+                    col.forEach((c, rowIdx) => {
+                        c.width = cardW; c.height = cardH;
+                        if (!isCardDragged(c)) {
+                            c.x = colX;
+                            c.y = 180 + rowIdx * 18;
+                        }
+                    });
+                });
+            }
+
+            handleSolitairePointerDown(pos) {
+                const s = this.solitaireState;
+                if (!s) return;
+
+                const cardW = Math.min(75, (this.canvas.width - 40) / 7 - 8);
+                const cardH = cardW * 1.4;
+                const startX = (this.canvas.width - (7 * (cardW + 8))) / 2;
+
+                // 1. Click Stock
+                if (pos.x >= startX && pos.x <= startX + cardW && pos.y >= 50 && pos.y <= 50 + cardH) {
+                    Sound.playCardFlip();
+                    if (s.stock.length > 0) {
+                        const c = s.stock.pop();
+                        c.faceUp = true;
+                        s.waste.push(c);
+                    } else {
+                        s.stock = s.waste.reverse().map(c => { c.faceUp = false; return c; });
+                        s.waste = [];
+                    }
+                    this.layoutSolitaire();
+                    return;
+                }
+
+                // 2. Drag from Waste
+                if (s.waste.length > 0) {
+                    const topWaste = s.waste[s.waste.length - 1];
+                    if (topWaste.containsPoint(pos.x, pos.y)) {
+                        Sound.playCardFlip();
+                        this.startDrag([topWaste], 'waste', pos);
+                        return;
+                    }
+                }
+
+                // 3. Drag from Foundation
+                const suits = ['spade', 'heart', 'diamond', 'club'];
+                for (let i = 0; i < 4; i++) {
+                    const suit = suits[i];
+                    const pile = s.foundations[suit];
+                    if (pile.length > 0) {
+                        const topCard = pile[pile.length - 1];
+                        if (topCard.containsPoint(pos.x, pos.y)) {
+                            Sound.playCardFlip();
+                            this.startDrag([topCard], 'foundation', pos, { suit });
+                            return;
+                        }
+                    }
+                }
+
+                // 4. Drag from Tableau
+                for (let colIdx = 0; colIdx < 7; colIdx++) {
+                    const col = s.tableau[colIdx];
+                    for (let cardIdx = 0; cardIdx < col.length; cardIdx++) {
+                        const card = col[cardIdx];
+                        // If card is face up and clicked (handling stack overlap)
+                        const isTopCard = (cardIdx === col.length - 1);
+                        const cardBoxH = isTopCard ? cardH : 18;
+                        
+                        if (card.faceUp && pos.x >= card.x && pos.x <= card.x + cardW &&
+                            pos.y >= card.y && pos.y <= card.y + cardBoxH) {
+                            
+                            Sound.playCardFlip();
+                            const draggedCards = col.slice(cardIdx);
+                            this.startDrag(draggedCards, 'tableau', pos, { colIdx, cardIdx });
+                            return;
+                        }
+                    }
+                }
+            }
+
+            startDrag(cards, sourceType, pos, extraInfo = {}) {
+                this.dragData = {
+                    cards,
+                    sourceType,
+                    extraInfo,
+                    offsetX: pos.x - cards[0].x,
+                    offsetY: pos.y - cards[0].y,
+                    startX: cards[0].x,
+                    startY: cards[0].y
+                };
+            }
+
+            handleSolitairePointerMove(pos) {
+                if (!this.dragData) return;
+                const { cards, offsetX, offsetY } = this.dragData;
+                const baseX = pos.x - offsetX;
+                const baseY = pos.y - offsetY;
+
+                cards.forEach((card, index) => {
+                    card.x = baseX;
+                    card.y = baseY + index * 18;
+                });
+            }
+
+            handleSolitairePointerUp(pos) {
+                if (!this.dragData) return;
+
+                const { cards, sourceType, extraInfo, startX, startY } = this.dragData;
+                const mainCard = cards[0];
+                const s = this.solitaireState;
+
+                const cardW = Math.min(75, (this.canvas.width - 40) / 7 - 8);
+                const startXOffset = (this.canvas.width - (7 * (cardW + 8))) / 2;
+
+                let moved = false;
+
+                // Try Drop to Foundation (only 1 card at a time)
+                if (cards.length === 1) {
+                    const suits = ['spade', 'heart', 'diamond', 'club'];
+                    for (let i = 0; i < 4; i++) {
+                        const fX = startXOffset + (i + 3) * (cardW + 8);
+                        const fY = 50;
+                        if (Math.abs(mainCard.x - fX) < cardW * 0.7 && Math.abs(mainCard.y - fY) < cardW * 0.7) {
+                            const targetSuit = suits[i];
+                            const pile = s.foundations[targetSuit];
+                            const reqVal = pile.length + 1;
+
+                            if (mainCard.suit === targetSuit && mainCard.value === reqVal) {
+                                // Move successful
+                                this.removeFromSource(mainCard, sourceType, extraInfo);
+                                pile.push(mainCard);
+                                Sound.playSuccess();
+                                this.addScore(100);
+                                moved = true;
+                                this.checkSolitaireWin();
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // Try Drop to Tableau Column
+                if (!moved) {
+                    for (let targetColIdx = 0; targetColIdx < 7; targetColIdx++) {
+                        const colX = startXOffset + targetColIdx * (cardW + 8);
+                        const targetCol = s.tableau[targetColIdx];
+                        const targetY = targetCol.length > 0 ? targetCol[targetCol.length - 1].y : 180;
+
+                        if (Math.abs(mainCard.x - colX) < cardW * 0.7 && Math.abs(mainCard.y - targetY) < cardW * 1.2) {
+                            // Check Rule
+                            let canPlace = false;
+                            if (targetCol.length === 0) {
+                                // Empty column accepts Kings only
+                                if (mainCard.value === 13) canPlace = true;
+                            } else {
+                                const topCard = targetCol[targetCol.length - 1];
+                                if (topCard.faceUp && this.canMoveSolitaire(mainCard, topCard)) {
+                                    canPlace = true;
+                                }
+                            }
+
+                            if (canPlace) {
+                                this.removeFromSource(mainCard, sourceType, extraInfo, cards.length);
+                                targetCol.push(...cards);
+                                Sound.playSuccess();
+                                this.addScore(30);
+                                moved = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // Auto Double-Tap/Click to Foundation logic if clicked without much drag
+                const distMoved = Math.hypot(pos.x - this.pointerStartPos.x, pos.y - this.pointerStartPos.y);
+                if (!moved && distMoved < 6 && cards.length === 1) {
+                    // Try auto move to foundation
+                    const targetSuit = mainCard.suit;
+                    const pile = s.foundations[targetSuit];
+                    if (mainCard.value === pile.length + 1) {
+                        this.removeFromSource(mainCard, sourceType, extraInfo);
+                        pile.push(mainCard);
+                        Sound.playSuccess();
+                        this.addScore(100);
+                        moved = true;
+                        this.checkSolitaireWin();
+                    }
+                }
+
+                if (!moved) {
+                    Sound.playFail();
+                }
+
+                this.dragData = null;
+                this.layoutSolitaire();
+            }
+
+            removeFromSource(mainCard, sourceType, extraInfo, count = 1) {
+                const s = this.solitaireState;
+                if (sourceType === 'waste') {
+                    s.waste.pop();
+                } else if (sourceType === 'foundation') {
+                    s.foundations[extraInfo.suit].pop();
+                } else if (sourceType === 'tableau') {
+                    const srcCol = s.tableau[extraInfo.colIdx];
+                    srcCol.splice(extraInfo.cardIdx, count);
+                    // Turn face up the new top card of source column
+                    if (srcCol.length > 0 && !srcCol[srcCol.length - 1].faceUp) {
+                        srcCol[srcCol.length - 1].faceUp = true;
+                        this.addScore(20);
+                    }
+                }
+            }
+
+            checkSolitaireWin() {
+                const s = this.solitaireState;
+                const totalInFoundations = Object.values(s.foundations).reduce((acc, pile) => acc + pile.length, 0);
+                if (totalInFoundations === 52) {
+                    Sound.playVictory();
+                    RankingManager.addScore('solitaire', this.score + 1000);
+                    setTimeout(() => {
+                        showMsgModal('👑 ソリティア クリア！', `最終スコア: ${this.score + 1000}`);
+                    }, 500);
+                }
+            }
+
+            canMoveSolitaire(card, targetCard) {
+                const isDiffColor = (card.suitInfo.color !== targetCard.suitInfo.color);
+                return isDiffColor && card.value === targetCard.value - 1;
+            }
+
+            drawSolitaire() {
+                const ctx = this.ctx;
+                const w = this.canvas.width;
+                const s = this.solitaireState;
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 22px "M PLUS Rounded 1c"';
+                ctx.textAlign = 'center';
+                ctx.fillText('ソリティア (Solitaire)', w / 2, 34);
+
+                const cardW = Math.min(75, (w - 40) / 7 - 8);
+                const cardH = cardW * 1.4;
+                const startX = (w - (7 * (cardW + 8))) / 2;
+
+                // Draw Empty Slots for Stock & Foundations
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.roundRect(startX, 50, cardW, cardH, 8);
+                ctx.stroke();
+
+                for (let i = 0; i < 4; i++) {
+                    ctx.beginPath();
+                    ctx.roundRect(startX + (i + 3) * (cardW + 8), 50, cardW, cardH, 8);
+                    ctx.stroke();
+                }
+
+                // Draw Cards on Table (non-dragged first)
+                s.stock.forEach(c => { if (!this.dragData || !this.dragData.cards.includes(c)) c.draw(ctx); });
+                s.waste.forEach(c => { if (!this.dragData || !this.dragData.cards.includes(c)) c.draw(ctx); });
+                Object.values(s.foundations).flat().forEach(c => { if (!this.dragData || !this.dragData.cards.includes(c)) c.draw(ctx); });
+                s.tableau.flat().forEach(c => { if (!this.dragData || !this.dragData.cards.includes(c)) c.draw(ctx); });
+
+                // Draw Currently Dragged Cards on Top
+                if (this.dragData) {
+                    this.dragData.cards.forEach(c => c.draw(ctx));
+                }
+            }
+
+            handlePointerDown(e) {
+                const pos = this.getPointerPos(e);
+                this.pointerStartPos = pos;
+
+                if (this.currentMode === 'TITLE') {
+                    if (this.titleButtons) {
+                        this.titleButtons.forEach(btn => {
+                            if (pos.x >= btn.rect.x && pos.x <= btn.rect.x + btn.rect.w &&
+                                pos.y >= btn.rect.y && pos.y <= btn.rect.y + btn.rect.h) {
+                                Sound.playSuccess();
+                                if (btn.id === 'HILOW') this.startHiLow();
+                                if (btn.id === 'MEMORY') this.startMemory();
+                                if (btn.id === 'SEVENS') this.startSevens();
+                                if (btn.id === 'SOLITAIRE') this.startSolitaire();
+                            }
+                        });
+                    }
+                } else if (this.currentMode === 'MEMORY') {
+                    this.clickMemory(pos.x, pos.y);
+                } else if (this.currentMode === 'SEVENS') {
+                    this.clickSevens(pos.x, pos.y);
+                } else if (this.currentMode === 'SOLITAIRE') {
+                    this.handleSolitairePointerDown(pos);
+                }
+            }
+
+            handlePointerMove(e) {
+                const pos = this.getPointerPos(e);
+
+                if (this.currentMode === 'TITLE' && this.titleButtons) {
+                    this.titleButtons.forEach(btn => {
+                        btn.hover = (pos.x >= btn.rect.x && pos.x <= btn.rect.x + btn.rect.w &&
+                                     pos.y >= btn.rect.y && pos.y <= btn.rect.y + btn.rect.h);
+                    });
+                } else if (this.currentMode === 'SOLITAIRE') {
+                    this.handleSolitairePointerMove(pos);
+                }
+            }
+
+            handlePointerUp(e) {
+                const pos = this.getPointerPos(e);
+                if (this.currentMode === 'SOLITAIRE') {
+                    this.handleSolitairePointerUp(pos);
+                }
+            }
+
+            loop() {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+                if (this.currentMode === 'TITLE') this.drawTitleScreen();
+                else if (this.currentMode === 'HILOW') this.drawHiLow();
+                else if (this.currentMode === 'MEMORY') this.drawMemory();
+                else if (this.currentMode === 'SEVENS') this.drawSevens();
+                else if (this.currentMode === 'SOLITAIRE') this.drawSolitaire();
+
+                requestAnimationFrame(() => this.loop());
+            }
+
+            returnToMenu() {
+                this.currentMode = 'TITLE';
+                this.dragData = null;
+                this.gameControls.classList.add('hidden');
+                this.setScore(0);
+                this.initTitleAnimation();
+            }
+        }
+
+        let engine;
+
+        function showMsgModal(title, body) {
+            document.getElementById('msg-title').innerText = title;
+            document.getElementById('msg-body').innerText = body;
+            document.getElementById('modal-msg').classList.remove('hidden');
+            confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } });
+        }
+
+        window.onload = function() {
+            Sound.init();
+            engine = new GameEngine();
+
+            // Menu / Home Button
+            document.getElementById('btn-home').onclick = () => {
+                engine.returnToMenu();
+            };
+
+            // Sound Toggle Button
+            document.getElementById('btn-sound').onclick = () => {
+                Sound.muted = !Sound.muted;
+                const icon = document.getElementById('sound-icon');
+                if (Sound.muted) {
+                    icon.className = 'fa-solid fa-volume-xmark text-rose-400';
+                } else {
+                    icon.className = 'fa-solid fa-volume-high text-slate-300';
+                }
+            };
+
+            // Ranking Modal Toggle
+            const rankingModal = document.getElementById('modal-ranking');
+            document.getElementById('btn-ranking').onclick = () => {
+                updateRankingDisplay('hilow');
+                rankingModal.classList.remove('hidden');
+            };
+
+            document.querySelectorAll('.btn-close-modal').forEach(b => {
+                b.onclick = () => {
+                    rankingModal.classList.add('hidden');
+                    document.getElementById('modal-msg').classList.add('hidden');
+                };
+            });
+
+            // Ranking Tabs
+            document.querySelectorAll('.rank-tab').forEach(tab => {
+                tab.onclick = (e) => {
+                    document.querySelectorAll('.rank-tab').forEach(t => {
+                        t.classList.remove('bg-amber-500', 'text-slate-950');
+                        t.classList.add('text-slate-400');
+                    });
+                    e.target.classList.add('bg-amber-500', 'text-slate-950');
+                    e.target.classList.remove('text-slate-400');
+                    updateRankingDisplay(e.target.dataset.game);
+                };
+            });
+
+            // Message Modal Buttons
+            document.getElementById('btn-msg-home').onclick = () => {
+                document.getElementById('modal-msg').classList.add('hidden');
+                engine.returnToMenu();
+            };
+
+            document.getElementById('btn-msg-restart').onclick = () => {
+                document.getElementById('modal-msg').classList.add('hidden');
+                const mode = engine.currentMode;
+                if (mode === 'HILOW') engine.startHiLow();
+                if (mode === 'MEMORY') engine.startMemory();
+                if (mode === 'SEVENS') engine.startSevens();
+                if (mode === 'SOLITAIRE') engine.startSolitaire();
+            };
+        };
+
+        function updateRankingDisplay(gameKey) {
+            const list = document.getElementById('ranking-list');
+            const scores = RankingManager.getScores(gameKey);
+
+            if (scores.length === 0) {
+                list.innerHTML = `<div class="text-center text-slate-500 py-8">まだ記録がありません</div>`;
+                return;
+            }
+
+            list.innerHTML = scores.map((item, index) => `
+                <div class="flex items-center justify-between bg-slate-800/60 px-4 py-2.5 rounded-xl border border-slate-700/50">
+                    <div class="flex items-center space-x-3">
+                        <span class="font-black text-sm ${index === 0 ? 'text-amber-400' : index === 1 ? 'text-slate-300' : index === 2 ? 'text-amber-600' : 'text-slate-500'}">
+                            ${index + 1}位
+                        </span>
+                        <span class="text-xs text-slate-400">${item.date}</span>
+                    </div>
+                    <span class="font-extrabold text-amber-300 text-sm">${item.score} pt</span>
+                </div>
+            `).join('');
+        }
+    </script>
+</body>
+</html>
