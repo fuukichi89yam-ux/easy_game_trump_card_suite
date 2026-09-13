@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>トランプゲーム コレクション</title>
+    <title>トランプカードゲーム コレクション</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome Icons -->
@@ -13,7 +13,7 @@
     <!-- Canvas Confetti for Victory Effects -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap');
         
         body {
             font-family: 'M PLUS Rounded 1c', sans-serif;
@@ -42,9 +42,18 @@
         }
 
         .glass-panel {
-            background: rgba(15, 23, 42, 0.75);
+            background: rgba(15, 23, 42, 0.85);
             backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        /* Pulse animation for Auto-Solve Button */
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 15px rgba(245, 158, 11, 0.6); transform: scale(1); }
+            50% { box-shadow: 0 0 25px rgba(245, 158, 11, 0.9); transform: scale(1.04); }
+        }
+        .solve-btn-glow {
+            animation: pulse-glow 2s infinite ease-in-out;
         }
     </style>
 </head>
@@ -53,7 +62,7 @@
     <!-- Header Navbar -->
     <header class="h-16 bg-slate-900/90 border-b border-slate-800 px-4 flex items-center justify-between z-20 shrink-0">
         <div class="flex items-center space-x-3">
-            <button id="btn-home" class="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-emerald-400 px-3 py-2 rounded-xl transition duration-150 border border-slate-700 shadow">
+            <button id="btn-home" class="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-emerald-400 px-3 py-2 rounded-xl transition border border-slate-700 shadow">
                 <i class="fa-solid fa-house text-lg"></i>
                 <span class="font-bold text-sm hidden sm:inline">メニュー</span>
             </button>
@@ -63,7 +72,7 @@
         </div>
 
         <!-- Dynamic Game Info & Stats Header -->
-        <div class="flex items-center space-x-4">
+        <div class="flex items-center space-x-3 sm:space-x-4">
             <!-- Sound Toggle -->
             <button id="btn-sound" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition border border-slate-700">
                 <i class="fa-solid fa-volume-high text-lg" id="sound-icon"></i>
@@ -91,8 +100,8 @@
         <!-- Main HTML5 Canvas -->
         <canvas id="gameCanvas" class="w-full h-full block cursor-pointer"></canvas>
 
-        <!-- Dynamic Control Bar Overlay for Games (HTML Overlay) -->
-        <div id="game-controls" class="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-center space-x-3 pointer-events-auto z-10 hidden">
+        <!-- Dynamic Control Bar Overlay for Games -->
+        <div id="game-controls" class="absolute bottom-5 left-1/2 transform -translate-x-1/2 flex items-center space-x-3 pointer-events-auto z-10 hidden">
             <!-- Buttons dynamically inserted based on active game -->
         </div>
     </main>
@@ -134,7 +143,7 @@
         <div class="glass-panel w-full max-w-sm rounded-3xl p-6 text-center border border-slate-700 shadow-2xl transform transition-all scale-100">
             <div id="msg-icon" class="text-5xl mb-3 text-amber-400">🎉</div>
             <h3 id="msg-title" class="text-2xl font-black mb-2 text-white">ゲームクリア！</h3>
-            <p id="msg-body" class="text-slate-300 text-sm mb-6">スコア: <span id="msg-score" class="text-amber-400 font-bold">1000</span></p>
+            <p id="msg-body" class="text-slate-300 text-sm mb-6 whitespace-pre-line">スコア: <span id="msg-score" class="text-amber-400 font-bold">1000</span></p>
             <div class="flex space-x-3">
                 <button id="btn-msg-home" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-3 rounded-xl transition border border-slate-700">
                     メニュー
@@ -147,7 +156,7 @@
     </div>
 
     <script>
-        // Sound System using Tone.js
+        // Sound System using Tone.js synthesizer
         const Sound = {
             muted: false,
             synth: null,
@@ -157,7 +166,7 @@
                 try {
                     this.synth = new Tone.Synth().toDestination();
                     this.polySynth = new Tone.PolySynth().toDestination();
-                    Tone.Destination.volume.value = -6; // Slightly softer volume
+                    Tone.Destination.volume.value = -6;
                 } catch(e) {
                     console.log("Audio Init Error", e);
                 }
@@ -197,10 +206,18 @@
                     this.polySynth.triggerAttackRelease(["G4", "B4", "D5", "G5"], "8n", now + 0.2);
                     this.polySynth.triggerAttackRelease(["C5", "E5", "G5", "C6"], "4n", now + 0.4);
                 } catch(e) {}
+            },
+
+            playAutoSolveChime() {
+                if (this.muted || !this.polySynth) return;
+                try {
+                    Tone.start();
+                    const now = Tone.now();
+                    this.polySynth.triggerAttackRelease(["G5", "C6", "E6"], "16n", now);
+                } catch(e) {}
             }
         };
 
-        // Card Representation
         const SUITS = {
             spade: { symbol: '♠', color: '#0f172a', name: 'spade' },
             heart: { symbol: '♥', color: '#dc2626', name: 'heart' },
@@ -217,15 +234,15 @@
                 this.y = 0;
                 this.width = 80;
                 this.height = 116;
-                this.targetX = 0;
-                this.targetY = 0;
                 this.highlighted = false;
-                this.selectable = true;
-                this.animating = false;
             }
 
             get suitInfo() {
                 return SUITS[this.suit];
+            }
+
+            get isRed() {
+                return this.suit === 'heart' || this.suit === 'diamond';
             }
 
             get valueStr() {
@@ -249,7 +266,7 @@
                 const w = this.width;
                 const h = this.height;
 
-                // Draw Base Card Body
+                // Draw Outer Rounded Box
                 ctx.beginPath();
                 ctx.moveTo(radius, 0);
                 ctx.lineTo(w - radius, 0);
@@ -266,34 +283,36 @@
                     ctx.fillStyle = '#ffffff';
                     ctx.fill();
 
-                    // Remove Shadow for inner details
                     ctx.shadowColor = 'transparent';
 
                     // Selection / Highlight Border
                     if (this.highlighted) {
-                        ctx.strokeStyle = '#f59e0b'; // Amber border
+                        ctx.strokeStyle = '#f59e0b';
                         ctx.lineWidth = 4;
                         ctx.stroke();
                     } else {
-                        ctx.strokeStyle = '#cbd5e1'; // Light border
+                        ctx.strokeStyle = '#cbd5e1';
                         ctx.lineWidth = 1;
                         ctx.stroke();
                     }
 
-                    // Card Rank & Suit Drawing
+                    // Card Content
                     const color = this.suitInfo.color;
                     ctx.fillStyle = color;
-                    ctx.font = 'bold 16px "M PLUS Rounded 1c", sans-serif';
+
+                    // Rank font responsive to card size
+                    const rankFontSize = Math.max(12, Math.floor(w * 0.22));
+                    ctx.font = `bold ${rankFontSize}px "M PLUS Rounded 1c", sans-serif`;
                     ctx.textAlign = 'left';
                     ctx.textBaseline = 'top';
 
                     // Top Left Rank & Symbol
-                    ctx.fillText(this.valueStr, 6, 6);
-                    ctx.font = '14px sans-serif';
-                    ctx.fillText(this.suitInfo.symbol, 6, 24);
+                    ctx.fillText(this.valueStr, w * 0.08, h * 0.06);
+                    ctx.font = `${Math.max(10, Math.floor(w * 0.18))}px sans-serif`;
+                    ctx.fillText(this.suitInfo.symbol, w * 0.08, h * 0.22);
 
-                    // Center Big Suit Icon
-                    ctx.font = '36px sans-serif';
+                    // Center Big Suit Symbol
+                    ctx.font = `${Math.max(20, Math.floor(w * 0.45))}px sans-serif`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText(this.suitInfo.symbol, w / 2, h / 2);
@@ -302,17 +321,17 @@
                     ctx.save();
                     ctx.translate(w, h);
                     ctx.rotate(Math.PI);
-                    ctx.font = 'bold 16px "M PLUS Rounded 1c", sans-serif';
+                    ctx.font = `bold ${rankFontSize}px "M PLUS Rounded 1c", sans-serif`;
                     ctx.textAlign = 'left';
                     ctx.textBaseline = 'top';
-                    ctx.fillText(this.valueStr, 6, 6);
-                    ctx.font = '14px sans-serif';
-                    ctx.fillText(this.suitInfo.symbol, 6, 24);
+                    ctx.fillText(this.valueStr, w * 0.08, h * 0.06);
+                    ctx.font = `${Math.max(10, Math.floor(w * 0.18))}px sans-serif`;
+                    ctx.fillText(this.suitInfo.symbol, w * 0.08, h * 0.22);
                     ctx.restore();
 
                 } else {
                     // Card Back Design
-                    ctx.fillStyle = '#1e3a8a'; // Deep blue
+                    ctx.fillStyle = '#1e3a8a';
                     ctx.fill();
                     ctx.shadowColor = 'transparent';
                     ctx.strokeStyle = '#ffffff';
@@ -321,14 +340,14 @@
 
                     // Pattern on Back
                     ctx.fillStyle = '#2563eb';
-                    const pad = 6;
+                    const pad = Math.max(3, Math.floor(w * 0.07));
                     ctx.fillRect(pad, pad, w - pad * 2, h - pad * 2);
 
                     // Cross Hatch Pattern
                     ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
                     ctx.lineWidth = 1;
                     ctx.beginPath();
-                    for (let i = -w; i < w * 2; i += 10) {
+                    for (let i = -w; i < w * 2; i += 8) {
                         ctx.moveTo(i, pad);
                         ctx.lineTo(i + h, h - pad);
                     }
@@ -342,15 +361,8 @@
                 return px >= this.x && px <= this.x + this.width &&
                        py >= this.y && py <= this.y + this.height;
             }
-
-            updatePos() {
-                // Smooth interpolation to target position
-                this.x += (this.targetX - this.x) * 0.25;
-                this.y += (this.targetY - this.y) * 0.25;
-            }
         }
 
-        // Helper Deck Builder
         function createDeck() {
             const deck = [];
             const suits = ['spade', 'heart', 'diamond', 'club'];
@@ -397,7 +409,7 @@
                 this.resizeCanvas();
                 window.addEventListener('resize', () => this.resizeCanvas());
 
-                // Mouse / Touch Event Listeners
+                // Mouse / Touch Input Handling
                 this.canvas.addEventListener('mousedown', (e) => this.handlePointerDown(e));
                 this.canvas.addEventListener('mousemove', (e) => this.handlePointerMove(e));
                 this.canvas.addEventListener('mouseup', (e) => this.handlePointerUp(e));
@@ -415,17 +427,19 @@
                     this.handlePointerUp(e);
                 }, { passive: false });
 
-                // Title Screen Cards for decoration
-                this.titleCards = [];
+                // Title animation decor cards
                 this.initTitleAnimation();
 
-                // Game Handlers
+                // Game States
                 this.hiLowState = null;
                 this.memoryState = null;
                 this.sevensState = null;
                 this.solitaireState = null;
 
-                // Animation loop
+                // Drag state
+                this.dragData = null;
+
+                // Start animation loop
                 requestAnimationFrame(() => this.loop());
             }
 
@@ -435,6 +449,10 @@
                 this.canvas.height = rect.height;
                 if (this.currentMode === 'SOLITAIRE') {
                     this.layoutSolitaire();
+                } else if (this.currentMode === 'MEMORY') {
+                    this.layoutMemoryCards();
+                } else if (this.currentMode === 'SEVENS') {
+                    this.updateSevensLayout();
                 }
             }
 
@@ -445,6 +463,14 @@
 
             addScore(val) {
                 this.setScore(this.score + val);
+            }
+
+            returnToMenu() {
+                this.currentMode = 'TITLE';
+                this.gameControls.classList.add('hidden');
+                this.gameControls.innerHTML = '';
+                document.getElementById('game-title-header').innerText = '🃏 トランプコレクション';
+                this.initTitleAnimation();
             }
 
             initTitleAnimation() {
@@ -475,8 +501,8 @@
                     c.draw(ctx);
                 });
 
-                // Title Banner Overlay
-                ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+                // Title Overlay Panel
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.82)';
                 ctx.fillRect(0, 0, width, height);
 
                 // Main Title Text
@@ -489,7 +515,7 @@
                 ctx.font = '900 32px "M PLUS Rounded 1c", sans-serif';
                 ctx.fillText('トランプゲーム コレクション', width / 2, height * 0.18);
 
-                ctx.fillStyle = '#94a3b8';
+                ctx.fillStyle = '#cbd5e1';
                 ctx.font = '700 15px "M PLUS Rounded 1c", sans-serif';
                 ctx.fillText('遊ぶゲームを選択してください', width / 2, height * 0.24);
                 ctx.restore();
@@ -511,7 +537,6 @@
                 const gap = 16;
                 
                 const totalWidth = cols * cardWidth + (cols - 1) * gap;
-                const totalHeight = rows * cardHeight + (rows - 1) * gap;
                 const startX = (width - totalWidth) / 2;
                 const startY = height * 0.35;
 
@@ -530,7 +555,7 @@
                     btn.hover = isHovered;
                     this.titleButtons[idx] = btn;
 
-                    // Draw Button Card Box
+                    // Draw Button Box
                     ctx.save();
                     ctx.translate(bx, by);
 
@@ -540,31 +565,28 @@
                     ctx.shadowColor = isHovered ? btn.color : 'rgba(0, 0, 0, 0.4)';
                     ctx.shadowBlur = isHovered ? 16 : 8;
 
-                    // Fill Box
+                    // Card Background
                     ctx.fillStyle = '#1e293b';
                     ctx.beginPath();
                     ctx.roundRect(0, 0, cardWidth, cardHeight, 16);
                     ctx.fill();
 
-                    // Border
+                    // Card Border
                     ctx.strokeStyle = isHovered ? btn.color : 'rgba(255, 255, 255, 0.15)';
                     ctx.lineWidth = isHovered ? 3 : 1.5;
                     ctx.stroke();
 
-                    // Content
+                    // Text Content
                     ctx.shadowBlur = 0;
                     ctx.textAlign = 'center';
 
-                    // Emoji Icon
                     ctx.font = `${isMobile ? '28px' : '36px'} sans-serif`;
                     ctx.fillText(btn.icon, cardWidth / 2, isMobile ? 36 : 45);
 
-                    // Title
                     ctx.fillStyle = '#ffffff';
                     ctx.font = `bold ${isMobile ? '16px' : '18px'} "M PLUS Rounded 1c"`;
                     ctx.fillText(btn.title, cardWidth / 2, isMobile ? 68 : 82);
 
-                    // Subtitle / Desc
                     ctx.fillStyle = '#94a3b8';
                     ctx.font = `${isMobile ? '11px' : '12px'} "M PLUS Rounded 1c"`;
                     ctx.fillText(btn.desc, cardWidth / 2, isMobile ? 92 : 110);
@@ -592,6 +614,7 @@
 
             startHiLow() {
                 this.currentMode = 'HILOW';
+                document.getElementById('game-title-header').innerText = '🔥 Hi or Low';
                 this.setScore(0);
                 this.hiLowState = {
                     deck: shuffle(createDeck()),
@@ -599,7 +622,7 @@
                     nextCard: null,
                     combo: 0,
                     gameOver: false,
-                    phase: 'GUESSING', // 'GUESSING' | 'RESULT'
+                    phase: 'GUESSING',
                     isCorrect: null,
                     lastGuess: null
                 };
@@ -611,10 +634,10 @@
 
             showHiLowGuessControls() {
                 this.gameControls.innerHTML = `
-                    <button id="btn-hi" class="bg-rose-600 hover:bg-rose-500 text-white font-black px-8 py-3 rounded-2xl shadow-lg transition text-lg flex items-center space-x-2">
+                    <button id="btn-hi" class="bg-rose-600 hover:bg-rose-500 text-white font-black px-6 sm:px-8 py-3 rounded-2xl shadow-lg transition text-base sm:text-lg flex items-center space-x-2 active:scale-95">
                         <i class="fa-solid fa-arrow-up"></i> <span>HIGH (高い)</span>
                     </button>
-                    <button id="btn-low" class="bg-sky-600 hover:bg-sky-500 text-white font-black px-8 py-3 rounded-2xl shadow-lg transition text-lg flex items-center space-x-2">
+                    <button id="btn-low" class="bg-sky-600 hover:bg-sky-500 text-white font-black px-6 sm:px-8 py-3 rounded-2xl shadow-lg transition text-base sm:text-lg flex items-center space-x-2 active:scale-95">
                         <i class="fa-solid fa-arrow-down"></i> <span>LOW (低い)</span>
                     </button>
                 `;
@@ -626,10 +649,10 @@
 
             showHiLowResultControls() {
                 this.gameControls.innerHTML = `
-                    <button id="btn-next" class="bg-emerald-600 hover:bg-emerald-500 text-white font-black px-8 py-3 rounded-2xl shadow-lg transition text-lg flex items-center space-x-2">
+                    <button id="btn-next" class="bg-emerald-600 hover:bg-emerald-500 text-white font-black px-8 py-3 rounded-2xl shadow-lg transition text-lg flex items-center space-x-2 active:scale-95">
                         <i class="fa-solid fa-forward"></i> <span>次へ</span>
                     </button>
-                    <button id="btn-quit" class="bg-slate-700 hover:bg-slate-600 text-white font-black px-8 py-3 rounded-2xl shadow-lg transition text-lg flex items-center space-x-2">
+                    <button id="btn-quit" class="bg-slate-700 hover:bg-slate-600 text-white font-black px-8 py-3 rounded-2xl shadow-lg transition text-lg flex items-center space-x-2 active:scale-95">
                         <i class="fa-solid fa-door-open"></i> <span>終了</span>
                     </button>
                 `;
@@ -716,7 +739,6 @@
                 const h = this.canvas.height;
                 const state = this.hiLowState;
 
-                // Center Title
                 ctx.fillStyle = '#ffffff';
                 ctx.font = 'bold 22px "M PLUS Rounded 1c"';
                 ctx.textAlign = 'center';
@@ -726,11 +748,9 @@
                 ctx.font = '14px "M PLUS Rounded 1c"';
                 ctx.fillText(`残りの山札: ${state.deck.length} 枚 | 連続コンボ: ${state.combo}x`, w / 2, 68);
 
-                // Card Positions
                 const cardW = 110;
                 const cardH = 160;
 
-                // Current Card Position (Left)
                 const curX = w / 2 - cardW - 20;
                 const curY = h / 2 - cardH / 2 - 20;
 
@@ -740,7 +760,6 @@
                 state.currentCard.y = curY;
                 state.currentCard.draw(ctx);
 
-                // Next Card Slot / Revealed Card (Right)
                 const nextX = w / 2 + 20;
                 const nextY = curY;
 
@@ -751,7 +770,6 @@
                     state.nextCard.y = nextY;
                     state.nextCard.draw(ctx);
                 } else {
-                    // Empty Card Slot Outline
                     ctx.save();
                     ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
                     ctx.setLineDash([6, 6]);
@@ -766,32 +784,35 @@
                     ctx.restore();
                 }
 
-                // Phase Result Display
                 if (state.phase === 'RESULT') {
                     ctx.save();
                     ctx.textAlign = 'center';
                     if (state.isCorrect) {
                         ctx.fillStyle = '#4ade80';
                         ctx.font = '900 24px "M PLUS Rounded 1c"';
-                        ctx.fillText('⭕️ 正解！', w / 2, curY + cardH + 32);
+                        ctx.fillText('⭕️ 正解！', w / 2, curY + cardH + 35);
                     } else {
                         ctx.fillStyle = '#f87171';
                         ctx.font = '900 24px "M PLUS Rounded 1c"';
-                        ctx.fillText('❌ 不正解…', w / 2, curY + cardH + 32);
+                        ctx.fillText('❌ 不正解…', w / 2, curY + cardH + 35);
                     }
-                    ctx.fillStyle = '#cbd5e1';
-                    ctx.font = '14px "M PLUS Rounded 1c"';
-                    ctx.fillText(`あなたの予想: ${state.lastGuess} | 「次へ」または「終了」を選択してください`, w / 2, curY + cardH + 58);
                     ctx.restore();
                 }
             }
 
             startMemory() {
                 this.currentMode = 'MEMORY';
+                document.getElementById('game-title-header').innerText = '🧠 神経衰弱';
                 this.setScore(0);
-                this.gameControls.classList.add('hidden');
 
-                // 24 cards (12 pairs) for optimized mobile/canvas layout
+                this.gameControls.innerHTML = `
+                    <button id="btn-retry-memory" class="bg-slate-700 hover:bg-slate-600 text-white font-bold px-6 py-2.5 rounded-xl shadow transition text-sm active:scale-95 flex items-center space-x-2">
+                        <i class="fa-solid fa-rotate-right"></i> <span>リトライ</span>
+                    </button>
+                `;
+                this.gameControls.classList.remove('hidden');
+                document.getElementById('btn-retry-memory').onclick = () => this.startMemory();
+
                 const suits = ['spade', 'heart'];
                 let selectedCards = [];
                 for (let s of suits) {
@@ -854,7 +875,6 @@
                             state.lock = true;
                             state.turns++;
 
-                            // Check Match
                             if (state.firstCard.value === state.secondCard.value) {
                                 Sound.playSuccess();
                                 this.addScore(200);
@@ -907,19 +927,18 @@
 
             startSevens() {
                 this.currentMode = 'SEVENS';
+                document.getElementById('game-title-header').innerText = '7️⃣ 7並べ';
                 this.setScore(0);
 
                 const fullDeck = createDeck();
                 const shuffled = shuffle(fullDeck);
 
-                // 4 Players (0: Player, 1: CPU1, 2: CPU2, 3: CPU3)
                 const hands = [[], [], [], []];
                 const board = { spade: {}, heart: {}, diamond: {}, club: {} };
 
                 shuffled.forEach((card, idx) => {
                     const playerIdx = idx % 4;
                     if (card.value === 7) {
-                        // Place 7s directly on board
                         card.faceUp = true;
                         board[card.suit][7] = card;
                     } else {
@@ -927,7 +946,6 @@
                     }
                 });
 
-                // Sort hands by suit and value
                 hands.forEach(h => {
                     h.sort((a, b) => a.suit.localeCompare(b.suit) || a.value - b.value);
                 });
@@ -936,18 +954,22 @@
                     board,
                     hands,
                     passes: [0, 0, 0, 0],
-                    turn: 0, // 0 is player
+                    turn: 0,
                     finished: [false, false, false, false],
                     rankings: []
                 };
 
                 this.gameControls.innerHTML = `
-                    <button id="btn-pass" class="bg-amber-600 hover:bg-amber-500 text-white font-bold px-6 py-2.5 rounded-xl shadow transition text-sm">
+                    <button id="btn-pass" class="bg-amber-600 hover:bg-amber-500 text-white font-bold px-6 py-2.5 rounded-xl shadow transition text-sm active:scale-95">
                         パス (<span id="pass-count">3</span>/3)
+                    </button>
+                    <button id="btn-retry-sevens" class="bg-slate-700 hover:bg-slate-600 text-white font-bold px-6 py-2.5 rounded-xl shadow transition text-sm active:scale-95 flex items-center space-x-2">
+                        <i class="fa-solid fa-rotate-right"></i> <span>リトライ</span>
                     </button>
                 `;
                 this.gameControls.classList.remove('hidden');
                 document.getElementById('btn-pass').onclick = () => this.passSevens();
+                document.getElementById('btn-retry-sevens').onclick = () => this.startSevens();
 
                 this.updateSevensLayout();
             }
@@ -958,7 +980,6 @@
                 const h = this.canvas.height;
                 const playerHand = this.sevensState.hands[0];
 
-                // Player card sizes
                 const cardW = Math.min(60, (w - 40) / Math.max(playerHand.length, 1));
                 const cardH = cardW * 1.4;
                 const startX = (w - (playerHand.length * (cardW + 4))) / 2;
@@ -976,7 +997,7 @@
 
             canPlaySevensCard(card) {
                 const b = this.sevensState.board[card.suit];
-                return b[card.value - 1] || b[card.value + 1];
+                return !!(b[card.value - 1] || b[card.value + 1]);
             }
 
             clickSevens(x, y) {
@@ -988,7 +1009,6 @@
                     const card = playerHand[i];
                     if (card.containsPoint(x, y) && this.canPlaySevensCard(card)) {
                         Sound.playSuccess();
-                        // Play card
                         state.board[card.suit][card.value] = card;
                         playerHand.splice(i, 1);
 
@@ -1020,7 +1040,7 @@
 
             nextSevensTurn() {
                 const state = this.sevensState;
-                if (state.rankings.length >= 3) {
+                if (state.rankings.length >= 3 || state.finished[0]) {
                     this.endSevens();
                     return;
                 }
@@ -1029,7 +1049,7 @@
                 this.updateSevensLayout();
 
                 if (state.turn !== 0 && !state.finished[state.turn]) {
-                    setTimeout(() => this.cpuPlaySevens(), 600);
+                    setTimeout(() => this.cpuPlaySevens(), 500);
                 } else if (state.finished[state.turn]) {
                     this.nextSevensTurn();
                 }
@@ -1052,7 +1072,6 @@
                 } else {
                     state.passes[cpuIdx]++;
                     if (state.passes[cpuIdx] > 3) {
-                        // CPU eliminated - dump hand onto board
                         hand.forEach(c => {
                             c.faceUp = true;
                             state.board[c.suit][c.value] = c;
@@ -1082,7 +1101,6 @@
             drawSevens() {
                 const ctx = this.ctx;
                 const w = this.canvas.width;
-                const h = this.canvas.height;
                 const state = this.sevensState;
 
                 ctx.fillStyle = '#ffffff';
@@ -1090,7 +1108,6 @@
                 ctx.textAlign = 'center';
                 ctx.fillText('7並べ (Sevens)', w / 2, 36);
 
-                // Draw Board Grid (7 in center)
                 const suits = ['spade', 'heart', 'diamond', 'club'];
                 const gridW = Math.min(42, (w - 40) / 13);
                 const gridH = gridW * 1.35;
@@ -1119,23 +1136,20 @@
                     }
                 });
 
-                // Draw Turn Info
                 ctx.fillStyle = state.turn === 0 ? '#f59e0b' : '#94a3b8';
                 ctx.font = 'bold 16px "M PLUS Rounded 1c"';
                 ctx.fillText(state.turn === 0 ? '👉 あなたのターン' : `CPU ${state.turn} が思考中...`, w / 2, startY + 4 * (gridH + 4) + 20);
 
-                // Draw Player Hand Cards
                 state.hands[0].forEach(c => c.draw(ctx));
             }
 
             startSolitaire() {
                 this.currentMode = 'SOLITAIRE';
+                document.getElementById('game-title-header').innerText = '👑 ソリティア (クロンダイク)';
                 this.setScore(0);
-                this.gameControls.classList.add('hidden');
 
                 const deck = shuffle(createDeck());
                 
-                // 7 Tableau Piles
                 const tableau = [[], [], [], [], [], [], []];
                 for (let i = 0; i < 7; i++) {
                     for (let j = 0; j <= i; j++) {
@@ -1150,10 +1164,104 @@
                     waste: [],
                     foundations: { spade: [], heart: [], diamond: [], club: [] },
                     tableau: tableau,
-                    selected: null
+                    isAutoSolving: false
                 };
 
                 this.layoutSolitaire();
+                this.updateSolitaireControls();
+            }
+
+            // Check conditions for Auto-Solve Button
+            // Conditions: Stock is 0 AND Waste is 0 AND all remaining tableau cards are face-up
+            canAutoSolve() {
+                const s = this.solitaireState;
+                if (!s || s.isAutoSolving) return false;
+
+                if (s.stock.length > 0 || s.waste.length > 0) return false;
+
+                // Check all cards in tableau columns are faceUp
+                for (let col of s.tableau) {
+                    for (let card of col) {
+                        if (!card.faceUp) return false;
+                    }
+                }
+
+                // Make sure total cards in foundations is less than 52 (not already finished)
+                const totalFoundationCards = Object.values(s.foundations).reduce((acc, pile) => acc + pile.length, 0);
+                return totalFoundationCards < 52;
+            }
+
+            updateSolitaireControls() {
+                if (this.currentMode !== 'SOLITAIRE') return;
+
+                let controlsHtml = `
+                    <button id="btn-retry-solitaire" class="bg-slate-700 hover:bg-slate-600 text-white font-bold px-6 py-2.5 rounded-xl shadow transition text-sm active:scale-95 flex items-center space-x-2">
+                        <i class="fa-solid fa-rotate-right"></i> <span>リトライ</span>
+                    </button>
+                `;
+
+                if (this.canAutoSolve()) {
+                    controlsHtml = `
+                        <button id="btn-auto-solve" class="solve-btn-glow bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black px-8 py-3 rounded-2xl shadow-xl transition text-lg flex items-center space-x-2 border border-amber-300 cursor-pointer">
+                            <i class="fa-solid fa-wand-magic-sparkles text-xl"></i>
+                            <span>【解決！】</span>
+                        </button>
+                    ` + controlsHtml;
+                }
+                
+                this.gameControls.innerHTML = controlsHtml;
+                this.gameControls.classList.remove('hidden');
+
+                document.getElementById('btn-retry-solitaire').onclick = () => this.startSolitaire();
+                if (this.canAutoSolve()) {
+                    document.getElementById('btn-auto-solve').onclick = () => this.triggerAutoSolve();
+                }
+            }
+
+            triggerAutoSolve() {
+                if (!this.canAutoSolve()) return;
+                const s = this.solitaireState;
+                s.isAutoSolving = true;
+                this.gameControls.classList.add('hidden');
+
+                const autoSolveStep = () => {
+                    if (this.currentMode !== 'SOLITAIRE' || !s) return;
+
+                    let moved = false;
+                    const suits = ['spade', 'heart', 'diamond', 'club'];
+
+                    // Search for tableau card that can be moved to foundation
+                    for (let col of s.tableau) {
+                        if (col.length > 0) {
+                            const card = col[col.length - 1];
+                            const pile = s.foundations[card.suit];
+                            if (pile.length + 1 === card.value) {
+                                // Move card to foundation
+                                pile.push(col.pop());
+                                Sound.playAutoSolveChime();
+                                this.addScore(15);
+                                moved = true;
+                                this.layoutSolitaire();
+                                break;
+                            }
+                        }
+                    }
+
+                    const totalFoundationCards = Object.values(s.foundations).reduce((acc, pile) => acc + pile.length, 0);
+                    if (totalFoundationCards === 52) {
+                        s.isAutoSolving = false;
+                        Sound.playVictory();
+                        this.addScore(1000);
+                        RankingManager.addScore('solitaire', this.score);
+                        showMsgModal('🎉 ソリティア 完全攻略！', `【解決！】ボタンで全自動整理完了！\n最終スコア: ${this.score}`);
+                    } else if (moved) {
+                        setTimeout(autoSolveStep, 100);
+                    } else {
+                        s.isAutoSolving = false;
+                    }
+                };
+
+                autoSolveStep();
             }
 
             layoutSolitaire() {
@@ -1164,11 +1272,9 @@
                 const startX = (w - (7 * (cardW + 8))) / 2;
                 
                 const s = this.solitaireState;
-
-                // Skip positions for currently dragged cards
                 const isCardDragged = (card) => this.dragData && this.dragData.cards.includes(card);
 
-                // Stock & Waste Position
+                // Stock & Waste
                 s.stock.forEach(c => {
                     c.width = cardW; c.height = cardH;
                     if (!isCardDragged(c)) { c.x = startX; c.y = 50; }
@@ -1180,7 +1286,7 @@
                     c.faceUp = true;
                 });
 
-                // Foundations Position
+                // Foundations
                 const suits = ['spade', 'heart', 'diamond', 'club'];
                 suits.forEach((suit, i) => {
                     s.foundations[suit].forEach(c => {
@@ -1190,14 +1296,15 @@
                     });
                 });
 
-                // Tableau Position
+                // Tableau Columns
+                const maxOffsetY = Math.max(12, Math.min(22, Math.floor(cardH * 0.22)));
                 s.tableau.forEach((col, colIdx) => {
                     const colX = startX + colIdx * (cardW + 8);
                     col.forEach((c, rowIdx) => {
                         c.width = cardW; c.height = cardH;
                         if (!isCardDragged(c)) {
                             c.x = colX;
-                            c.y = 180 + rowIdx * 18;
+                            c.y = 180 + rowIdx * maxOffsetY;
                         }
                     });
                 });
@@ -1205,28 +1312,29 @@
 
             handleSolitairePointerDown(pos) {
                 const s = this.solitaireState;
-                if (!s) return;
+                if (!s || s.isAutoSolving) return;
 
                 const cardW = Math.min(75, (this.canvas.width - 40) / 7 - 8);
                 const cardH = cardW * 1.4;
                 const startX = (this.canvas.width - (7 * (cardW + 8))) / 2;
 
-                // 1. Click Stock
+                // 1. Stock Click
                 if (pos.x >= startX && pos.x <= startX + cardW && pos.y >= 50 && pos.y <= 50 + cardH) {
                     Sound.playCardFlip();
                     if (s.stock.length > 0) {
                         const c = s.stock.pop();
                         c.faceUp = true;
                         s.waste.push(c);
-                    } else {
+                    } else if (s.waste.length > 0) {
                         s.stock = s.waste.reverse().map(c => { c.faceUp = false; return c; });
                         s.waste = [];
                     }
                     this.layoutSolitaire();
+                    this.updateSolitaireControls();
                     return;
                 }
 
-                // 2. Drag from Waste
+                // 2. Waste Card Drag
                 if (s.waste.length > 0) {
                     const topWaste = s.waste[s.waste.length - 1];
                     if (topWaste.containsPoint(pos.x, pos.y)) {
@@ -1236,7 +1344,7 @@
                     }
                 }
 
-                // 3. Drag from Foundation
+                // 3. Foundation Drag
                 const suits = ['spade', 'heart', 'diamond', 'club'];
                 for (let i = 0; i < 4; i++) {
                     const suit = suits[i];
@@ -1251,14 +1359,14 @@
                     }
                 }
 
-                // 4. Drag from Tableau
+                // 4. Tableau Drag
+                const maxOffsetY = Math.max(12, Math.min(22, Math.floor(cardH * 0.22)));
                 for (let colIdx = 0; colIdx < 7; colIdx++) {
                     const col = s.tableau[colIdx];
                     for (let cardIdx = 0; cardIdx < col.length; cardIdx++) {
                         const card = col[cardIdx];
-                        // If card is face up and clicked (handling stack overlap)
                         const isTopCard = (cardIdx === col.length - 1);
-                        const cardBoxH = isTopCard ? cardH : 18;
+                        const cardBoxH = isTopCard ? cardH : maxOffsetY;
                         
                         if (card.faceUp && pos.x >= card.x && pos.x <= card.x + cardW &&
                             pos.y >= card.y && pos.y <= card.y + cardBoxH) {
@@ -1290,9 +1398,13 @@
                 const baseX = pos.x - offsetX;
                 const baseY = pos.y - offsetY;
 
+                const cardW = cards[0].width;
+                const cardH = cards[0].height;
+                const maxOffsetY = Math.max(12, Math.min(22, Math.floor(cardH * 0.22)));
+
                 cards.forEach((card, index) => {
                     card.x = baseX;
-                    card.y = baseY + index * 18;
+                    card.y = baseY + index * maxOffsetY;
                 });
             }
 
@@ -1308,7 +1420,7 @@
 
                 let moved = false;
 
-                // Try Drop to Foundation (only 1 card at a time)
+                // Try Drop to Foundation
                 if (cards.length === 1) {
                     const suits = ['spade', 'heart', 'diamond', 'club'];
                     for (let i = 0; i < 4; i++) {
@@ -1320,13 +1432,11 @@
                             const reqVal = pile.length + 1;
 
                             if (mainCard.suit === targetSuit && mainCard.value === reqVal) {
-                                // Move successful
-                                this.removeFromSource(mainCard, sourceType, extraInfo);
+                                this.removeDraggedFromSource(sourceType, extraInfo);
                                 pile.push(mainCard);
                                 Sound.playSuccess();
-                                this.addScore(100);
+                                this.addScore(15);
                                 moved = true;
-                                this.checkSolitaireWin();
                                 break;
                             }
                         }
@@ -1335,92 +1445,88 @@
 
                 // Try Drop to Tableau Column
                 if (!moved) {
-                    for (let targetColIdx = 0; targetColIdx < 7; targetColIdx++) {
-                        const colX = startXOffset + targetColIdx * (cardW + 8);
-                        const targetCol = s.tableau[targetColIdx];
-                        const targetY = targetCol.length > 0 ? targetCol[targetCol.length - 1].y : 180;
+                    for (let colIdx = 0; colIdx < 7; colIdx++) {
+                        const col = s.tableau[colIdx];
+                        const colX = startXOffset + colIdx * (cardW + 8);
 
-                        if (Math.abs(mainCard.x - colX) < cardW * 0.7 && Math.abs(mainCard.y - targetY) < cardW * 1.2) {
-                            // Check Rule
-                            let canPlace = false;
-                            if (targetCol.length === 0) {
-                                // Empty column accepts Kings only
-                                if (mainCard.value === 13) canPlace = true;
-                            } else {
-                                const topCard = targetCol[targetCol.length - 1];
-                                if (topCard.faceUp && this.canMoveSolitaire(mainCard, topCard)) {
-                                    canPlace = true;
+                        // If empty column, requires King (13)
+                        if (col.length === 0) {
+                            if (Math.abs(mainCard.x - colX) < cardW * 0.7 && Math.abs(mainCard.y - 180) < cardW * 0.7) {
+                                if (mainCard.value === 13) {
+                                    this.removeDraggedFromSource(sourceType, extraInfo);
+                                    cards.forEach(c => col.push(c));
+                                    Sound.playSuccess();
+                                    this.addScore(5);
+                                    moved = true;
+                                    break;
                                 }
                             }
-
-                            if (canPlace) {
-                                this.removeFromSource(mainCard, sourceType, extraInfo, cards.length);
-                                targetCol.push(...cards);
-                                Sound.playSuccess();
-                                this.addScore(30);
-                                moved = true;
-                                break;
+                        } else {
+                            const targetCard = col[col.length - 1];
+                            if (Math.abs(mainCard.x - targetCard.x) < cardW * 0.7 && Math.abs(mainCard.y - targetCard.y) < cardW * 0.7) {
+                                // Rule: Alternating colors & descending rank
+                                if (mainCard.isRed !== targetCard.isRed && mainCard.value === targetCard.value - 1) {
+                                    this.removeDraggedFromSource(sourceType, extraInfo);
+                                    cards.forEach(c => col.push(c));
+                                    Sound.playSuccess();
+                                    this.addScore(5);
+                                    moved = true;
+                                    break;
+                                }
                             }
                         }
                     }
                 }
 
-                // Auto Double-Tap/Click to Foundation logic if clicked without much drag
-                const distMoved = Math.hypot(pos.x - this.pointerStartPos.x, pos.y - this.pointerStartPos.y);
-                if (!moved && distMoved < 6 && cards.length === 1) {
-                    // Try auto move to foundation
-                    const targetSuit = mainCard.suit;
-                    const pile = s.foundations[targetSuit];
-                    if (mainCard.value === pile.length + 1) {
-                        this.removeFromSource(mainCard, sourceType, extraInfo);
-                        pile.push(mainCard);
-                        Sound.playSuccess();
-                        this.addScore(100);
-                        moved = true;
-                        this.checkSolitaireWin();
+                // Single Click / Tap Auto-Move to Foundation (if not manually dropped elsewhere)
+                const distMoved = Math.hypot(mainCard.x - startX, mainCard.y - startY);
+                if (!moved && cards.length === 1 && distMoved < 20) {
+                    const isTopTableau = (sourceType === 'tableau' && extraInfo.cardIdx === s.tableau[extraInfo.colIdx].length - 1);
+                    const isWaste = (sourceType === 'waste');
+
+                    if (isTopTableau || isWaste) {
+                        const pile = s.foundations[mainCard.suit];
+                        if (pile && pile.length + 1 === mainCard.value) {
+                            this.removeDraggedFromSource(sourceType, extraInfo);
+                            pile.push(mainCard);
+                            Sound.playSuccess();
+                            this.addScore(15);
+                            moved = true;
+                        }
                     }
                 }
 
-                if (!moved) {
-                    Sound.playFail();
+                // If source tableau column exposed a face-down card, turn it over
+                if (moved && sourceType === 'tableau') {
+                    const srcCol = s.tableau[extraInfo.colIdx];
+                    if (srcCol.length > 0 && !srcCol[srcCol.length - 1].faceUp) {
+                        srcCol[srcCol.length - 1].faceUp = true;
+                        this.addScore(10);
+                    }
                 }
 
                 this.dragData = null;
                 this.layoutSolitaire();
+                this.updateSolitaireControls();
+
+                // Check standard victory (all 52 cards in foundations)
+                const totalFoundations = Object.values(s.foundations).reduce((acc, pile) => acc + pile.length, 0);
+                if (totalFoundations === 52) {
+                    Sound.playVictory();
+                    RankingManager.addScore('solitaire', this.score);
+                    showMsgModal('🎉 ソリティア 完全クリア！', `最終スコア: ${this.score}`);
+                }
             }
 
-            removeFromSource(mainCard, sourceType, extraInfo, count = 1) {
+            removeDraggedFromSource(sourceType, extraInfo) {
                 const s = this.solitaireState;
                 if (sourceType === 'waste') {
                     s.waste.pop();
                 } else if (sourceType === 'foundation') {
                     s.foundations[extraInfo.suit].pop();
                 } else if (sourceType === 'tableau') {
-                    const srcCol = s.tableau[extraInfo.colIdx];
-                    srcCol.splice(extraInfo.cardIdx, count);
-                    // Turn face up the new top card of source column
-                    if (srcCol.length > 0 && !srcCol[srcCol.length - 1].faceUp) {
-                        srcCol[srcCol.length - 1].faceUp = true;
-                        this.addScore(20);
-                    }
+                    s.tableau[extraInfo.colIdx].splice(extraInfo.cardIdx);
                 }
-            }
-
-            checkSolitaireWin() {
-                const s = this.solitaireState;
-                const totalInFoundations = Object.values(s.foundations).reduce((acc, pile) => acc + pile.length, 0);
-                if (totalInFoundations === 52) {
-                    Sound.playVictory();
-                    RankingManager.addScore('solitaire', this.score + 1000);
-                    setTimeout(() => {
-                        showMsgModal('👑 ソリティア クリア！', `最終スコア: ${this.score + 1000}`);
-                    }, 500);
-                }
-            }
-
-            canMoveSolitaire(card, targetCard) {
-                const isDiffColor = (card.suitInfo.color !== targetCard.suitInfo.color);
-                return isDiffColor && card.value === targetCard.value - 1;
             }
 
             drawSolitaire() {
@@ -1431,32 +1537,75 @@
                 ctx.fillStyle = '#ffffff';
                 ctx.font = 'bold 22px "M PLUS Rounded 1c"';
                 ctx.textAlign = 'center';
-                ctx.fillText('ソリティア (Solitaire)', w / 2, 34);
+                ctx.fillText('ソリティア (Klondike)', w / 2, 35);
 
                 const cardW = Math.min(75, (w - 40) / 7 - 8);
                 const cardH = cardW * 1.4;
                 const startX = (w - (7 * (cardW + 8))) / 2;
 
-                // Draw Empty Slots for Stock & Foundations
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.roundRect(startX, 50, cardW, cardH, 8);
-                ctx.stroke();
-
-                for (let i = 0; i < 4; i++) {
+                // 1. Stock Outline & Waste
+                if (s.stock.length > 0) {
+                    s.stock[s.stock.length - 1].draw(ctx);
+                } else {
+                    ctx.save();
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+                    ctx.lineWidth = 2;
                     ctx.beginPath();
-                    ctx.roundRect(startX + (i + 3) * (cardW + 8), 50, cardW, cardH, 8);
+                    ctx.roundRect(startX, 50, cardW, cardH, 8);
                     ctx.stroke();
+                    ctx.restore();
                 }
 
-                // Draw Cards on Table (non-dragged first)
-                s.stock.forEach(c => { if (!this.dragData || !this.dragData.cards.includes(c)) c.draw(ctx); });
-                s.waste.forEach(c => { if (!this.dragData || !this.dragData.cards.includes(c)) c.draw(ctx); });
-                Object.values(s.foundations).flat().forEach(c => { if (!this.dragData || !this.dragData.cards.includes(c)) c.draw(ctx); });
-                s.tableau.flat().forEach(c => { if (!this.dragData || !this.dragData.cards.includes(c)) c.draw(ctx); });
+                if (s.waste.length > 0) {
+                    s.waste[s.waste.length - 1].draw(ctx);
+                }
 
-                // Draw Currently Dragged Cards on Top
+                // 2. Foundation Slots & Cards
+                const suits = ['spade', 'heart', 'diamond', 'club'];
+                suits.forEach((suit, i) => {
+                    const fX = startX + (i + 3) * (cardW + 8);
+                    const pile = s.foundations[suit];
+
+                    if (pile.length > 0) {
+                        pile[pile.length - 1].draw(ctx);
+                    } else {
+                        ctx.save();
+                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+                        ctx.lineWidth = 1.5;
+                        ctx.beginPath();
+                        ctx.roundRect(fX, 50, cardW, cardH, 8);
+                        ctx.stroke();
+
+                        ctx.fillStyle = SUITS[suit].color;
+                        ctx.font = '24px sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(SUITS[suit].symbol, fX + cardW / 2, 50 + cardH / 2);
+                        ctx.restore();
+                    }
+                });
+
+                // 3. Tableau Columns
+                s.tableau.forEach((col, colIdx) => {
+                    const colX = startX + colIdx * (cardW + 8);
+                    if (col.length === 0) {
+                        ctx.save();
+                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+                        ctx.lineWidth = 1.5;
+                        ctx.beginPath();
+                        ctx.roundRect(colX, 180, cardW, cardH, 8);
+                        ctx.stroke();
+                        ctx.restore();
+                    } else {
+                        col.forEach(c => {
+                            if (!this.dragData || !this.dragData.cards.includes(c)) {
+                                c.draw(ctx);
+                            }
+                        });
+                    }
+                });
+
+                // 4. Draw Dragged Cards On Top
                 if (this.dragData) {
                     this.dragData.cards.forEach(c => c.draw(ctx));
                 }
@@ -1464,18 +1613,17 @@
 
             handlePointerDown(e) {
                 const pos = this.getPointerPos(e);
-                this.pointerStartPos = pos;
 
                 if (this.currentMode === 'TITLE') {
                     if (this.titleButtons) {
                         this.titleButtons.forEach(btn => {
-                            if (pos.x >= btn.rect.x && pos.x <= btn.rect.x + btn.rect.w &&
-                                pos.y >= btn.rect.y && pos.y <= btn.rect.y + btn.rect.h) {
-                                Sound.playSuccess();
+                            const r = btn.rect;
+                            if (pos.x >= r.x && pos.x <= r.x + r.w && pos.y >= r.y && pos.y <= r.y + r.h) {
+                                Sound.playCardFlip();
                                 if (btn.id === 'HILOW') this.startHiLow();
-                                if (btn.id === 'MEMORY') this.startMemory();
-                                if (btn.id === 'SEVENS') this.startSevens();
-                                if (btn.id === 'SOLITAIRE') this.startSolitaire();
+                                else if (btn.id === 'MEMORY') this.startMemory();
+                                else if (btn.id === 'SEVENS') this.startSevens();
+                                else if (btn.id === 'SOLITAIRE') this.startSolitaire();
                             }
                         });
                     }
@@ -1493,8 +1641,8 @@
 
                 if (this.currentMode === 'TITLE' && this.titleButtons) {
                     this.titleButtons.forEach(btn => {
-                        btn.hover = (pos.x >= btn.rect.x && pos.x <= btn.rect.x + btn.rect.w &&
-                                     pos.y >= btn.rect.y && pos.y <= btn.rect.y + btn.rect.h);
+                        const r = btn.rect;
+                        btn.hover = (pos.x >= r.x && pos.x <= r.x + r.w && pos.y >= r.y && pos.y <= r.y + r.h);
                     });
                 } else if (this.currentMode === 'SOLITAIRE') {
                     this.handleSolitairePointerMove(pos);
@@ -1509,119 +1657,127 @@
             }
 
             loop() {
+                // Clear Canvas
                 this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-                if (this.currentMode === 'TITLE') this.drawTitleScreen();
-                else if (this.currentMode === 'HILOW') this.drawHiLow();
-                else if (this.currentMode === 'MEMORY') this.drawMemory();
-                else if (this.currentMode === 'SEVENS') this.drawSevens();
-                else if (this.currentMode === 'SOLITAIRE') this.drawSolitaire();
+                // Render current game scene
+                if (this.currentMode === 'TITLE') {
+                    this.drawTitleScreen();
+                } else if (this.currentMode === 'HILOW') {
+                    this.drawHiLow();
+                } else if (this.currentMode === 'MEMORY') {
+                    this.drawMemory();
+                } else if (this.currentMode === 'SEVENS') {
+                    this.drawSevens();
+                } else if (this.currentMode === 'SOLITAIRE') {
+                    this.drawSolitaire();
+                }
 
                 requestAnimationFrame(() => this.loop());
             }
-
-            returnToMenu() {
-                this.currentMode = 'TITLE';
-                this.dragData = null;
-                this.gameControls.classList.add('hidden');
-                this.setScore(0);
-                this.initTitleAnimation();
-            }
         }
 
-        let engine;
+        let gameApp = null;
 
         function showMsgModal(title, body) {
             document.getElementById('msg-title').innerText = title;
             document.getElementById('msg-body').innerText = body;
             document.getElementById('modal-msg').classList.remove('hidden');
-            confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } });
+
+            // Trigger Victory Confetti
+            if (typeof confetti === 'function') {
+                confetti({
+                    particleCount: 100,
+                    spread: 70,
+                    origin: { y: 0.6 }
+                });
+            }
         }
 
         window.onload = function() {
             Sound.init();
-            engine = new GameEngine();
+            gameApp = new GameEngine();
 
-            // Menu / Home Button
+            // Home / Menu Button
             document.getElementById('btn-home').onclick = () => {
-                engine.returnToMenu();
+                if (gameApp.score > 0 && gameApp.currentMode !== 'TITLE') {
+                    const gameKey = gameApp.currentMode.toLowerCase();
+                    RankingManager.addScore(gameKey, gameApp.score);
+                }
+                gameApp.returnToMenu();
             };
 
             // Sound Toggle Button
-            document.getElementById('btn-sound').onclick = () => {
+            const soundBtn = document.getElementById('btn-sound');
+            const soundIcon = document.getElementById('sound-icon');
+            soundBtn.onclick = () => {
                 Sound.muted = !Sound.muted;
-                const icon = document.getElementById('sound-icon');
                 if (Sound.muted) {
-                    icon.className = 'fa-solid fa-volume-xmark text-rose-400';
+                    soundIcon.className = 'fa-solid fa-volume-xmark text-lg text-rose-400';
                 } else {
-                    icon.className = 'fa-solid fa-volume-high text-slate-300';
+                    soundIcon.className = 'fa-solid fa-volume-high text-lg text-slate-300';
                 }
             };
 
-            // Ranking Modal Toggle
-            const rankingModal = document.getElementById('modal-ranking');
-            document.getElementById('btn-ranking').onclick = () => {
-                updateRankingDisplay('hilow');
-                rankingModal.classList.remove('hidden');
+            // Ranking Modal & Tabs
+            const modalRanking = document.getElementById('modal-ranking');
+            const rankingList = document.getElementById('ranking-list');
+            
+            const updateRankingView = (gameKey) => {
+                const scores = RankingManager.getScores(gameKey);
+                if (scores.length === 0) {
+                    rankingList.innerHTML = `<div class="text-center text-slate-400 py-8">まだスコア記録がありません</div>`;
+                } else {
+                    rankingList.innerHTML = scores.map((sc, idx) => `
+                        <div class="flex items-center justify-between bg-slate-800/60 p-3 rounded-xl border border-slate-700/50">
+                            <div class="flex items-center space-x-3">
+                                <span class="font-black text-lg ${idx === 0 ? 'text-amber-400' : idx === 1 ? 'text-slate-300' : idx === 2 ? 'text-amber-600' : 'text-slate-500'}">#${idx + 1}</span>
+                                <span class="text-xs text-slate-400">${sc.date}</span>
+                            </div>
+                            <span class="font-extrabold text-amber-300 text-lg">${sc.score} pts</span>
+                        </div>
+                    `).join('');
+                }
             };
 
-            document.querySelectorAll('.btn-close-modal').forEach(b => {
-                b.onclick = () => {
-                    rankingModal.classList.add('hidden');
-                    document.getElementById('modal-msg').classList.add('hidden');
-                };
-            });
+            document.getElementById('btn-ranking').onclick = () => {
+                const activeTab = document.querySelector('.rank-tab.bg-amber-500');
+                const gameKey = activeTab ? activeTab.dataset.game : 'hilow';
+                updateRankingView(gameKey);
+                modalRanking.classList.remove('hidden');
+            };
 
-            // Ranking Tabs
             document.querySelectorAll('.rank-tab').forEach(tab => {
-                tab.onclick = (e) => {
+                tab.onclick = () => {
                     document.querySelectorAll('.rank-tab').forEach(t => {
-                        t.classList.remove('bg-amber-500', 'text-slate-950');
-                        t.classList.add('text-slate-400');
+                        t.className = 'rank-tab flex-1 py-2 rounded-lg transition text-slate-400';
                     });
-                    e.target.classList.add('bg-amber-500', 'text-slate-950');
-                    e.target.classList.remove('text-slate-400');
-                    updateRankingDisplay(e.target.dataset.game);
+                    tab.className = 'rank-tab flex-1 py-2 rounded-lg transition bg-amber-500 text-slate-950 font-bold';
+                    updateRankingView(tab.dataset.game);
                 };
             });
 
-            // Message Modal Buttons
+            // Close Modals
+            document.querySelectorAll('.btn-close-modal').forEach(btn => {
+                btn.onclick = () => {
+                    modalRanking.classList.add('hidden');
+                };
+            });
+
             document.getElementById('btn-msg-home').onclick = () => {
                 document.getElementById('modal-msg').classList.add('hidden');
-                engine.returnToMenu();
+                gameApp.returnToMenu();
             };
 
             document.getElementById('btn-msg-restart').onclick = () => {
                 document.getElementById('modal-msg').classList.add('hidden');
-                const mode = engine.currentMode;
-                if (mode === 'HILOW') engine.startHiLow();
-                if (mode === 'MEMORY') engine.startMemory();
-                if (mode === 'SEVENS') engine.startSevens();
-                if (mode === 'SOLITAIRE') engine.startSolitaire();
+                const mode = gameApp.currentMode;
+                if (mode === 'HILOW') gameApp.startHiLow();
+                else if (mode === 'MEMORY') gameApp.startMemory();
+                else if (mode === 'SEVENS') gameApp.startSevens();
+                else if (mode === 'SOLITAIRE') gameApp.startSolitaire();
             };
         };
-
-        function updateRankingDisplay(gameKey) {
-            const list = document.getElementById('ranking-list');
-            const scores = RankingManager.getScores(gameKey);
-
-            if (scores.length === 0) {
-                list.innerHTML = `<div class="text-center text-slate-500 py-8">まだ記録がありません</div>`;
-                return;
-            }
-
-            list.innerHTML = scores.map((item, index) => `
-                <div class="flex items-center justify-between bg-slate-800/60 px-4 py-2.5 rounded-xl border border-slate-700/50">
-                    <div class="flex items-center space-x-3">
-                        <span class="font-black text-sm ${index === 0 ? 'text-amber-400' : index === 1 ? 'text-slate-300' : index === 2 ? 'text-amber-600' : 'text-slate-500'}">
-                            ${index + 1}位
-                        </span>
-                        <span class="text-xs text-slate-400">${item.date}</span>
-                    </div>
-                    <span class="font-extrabold text-amber-300 text-sm">${item.score} pt</span>
-                </div>
-            `).join('');
-        }
     </script>
 </body>
 </html>
